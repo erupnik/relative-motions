@@ -28,11 +28,16 @@ file(GLOB_RECURSE TestER_SRC
     "src/main.cpp"
     "src/cov_in_motions.cpp"
     "src/bundle.cpp"
+    "src/check_propagation.cpp"
 )
 
 
-add_executable(${PROJECT_NAME} "src/main.cpp" "src/cov_in_motions.cpp" "src/bundle.cpp")
+add_executable(${PROJECT_NAME} "src/main.cpp" "src/cov_in_motions.cpp" "src/bundle.cpp" )
+add_executable("bench" "src/check_propagation.cpp" "src/cov_in_motions.cpp" "src/bundle.cpp" )
+
 
 target_link_libraries(${PROJECT_NAME} ${CERES_LIBRARIES}) #
+target_link_libraries("bench" ${CERES_LIBRARIES}) #
 
 install (TARGETS ${PROJECT_NAME} DESTINATION ${INSTALL_DIR})
+install (TARGETS "bench" DESTINATION ${INSTALL_DIR})

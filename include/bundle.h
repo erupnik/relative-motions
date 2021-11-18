@@ -18,7 +18,7 @@
 using namespace ceres;
 
 
-/* Mat3d aPds is the weight matrix (square root) */
+/*  pose_pds is the weight matrix (square root) */
 class cPoseConstraint
 {
     public:
@@ -48,30 +48,57 @@ class cPoseConstraint
       const double   pose_pds;
 };
 
+class cResidualOnPose
+{
+    public :
+        cResidualOnPose(const Mat3d aRot0,const Vec2d aPtBundle,const double* aPt3d,const double aPdsSqrt) :
+            mRot0(aRot0), mPtBundle(aPtBundle), mPt3d(aPt3d),mPdsSqrt(aPdsSqrt) {}
+        ~cResidualOnPose(){}
+
+        // Parameters: pose
+        template <typename T>
+        bool operator()(const T* const aW,
+                        const T* const aC,
+                        T* Residual) const;
+        static CostFunction * Create(const Mat3d mRotCur,
+                                     const Vec2d PtBundle,
+                                     const double* Pt3d,
+                                     const double PdsSqrt);
+
+    private:
+
+        const Mat3d   mRot0;
+        const Vec2d   mPtBundle;
+        const double *mPt3d;
+        const double  mPdsSqrt;
+
+};
+
 class cResidualError
 {
     public :
-        cResidualError(Mat3d aRot0,Vec2d aPtBundle,double aPdsSqrt) :
+        cResidualError(const Mat3d aRot0,const Vec2d aPtBundle,const double aPdsSqrt) :
             mRot0(aRot0), mPtBundle(aPtBundle), mPdsSqrt(aPdsSqrt) {}
         ~cResidualError(){}
 
+        // Parameters: pose and 3d points
         template <typename T>
         bool operator()(const T* const aW,
                         const T* const aC,
                         const T* const aPt3,
                         T* Residual) const;
-
-        static CostFunction * Create(const Mat3d mRotCur,const Vec2d PtBundle,const double PdsSqrt);
-        /*{
-          return  (new AutoDiffCostFunction<cResidualError,2,3,3,3> (new cResidualError(mRotCur,PtBundle,PdsSqrt)));
-        }*/
+        static CostFunction * Create(const Mat3d mRotCur,
+                                     const Vec2d PtBundle,
+                                     const double PdsSqrt);
 
     private:
 
-        Mat3d   mRot0;
-        Vec2d   mPtBundle;
-        double  mPdsSqrt;
+        const Mat3d   mRot0;
+        const Vec2d   mPtBundle;
+        const double  mPdsSqrt;
 
 };
+
+
 
 #endif //_BUNDLE_H
