@@ -1,1 +1,1 @@
-#tests on ceres
+#bundle adjustment with covariance propagation

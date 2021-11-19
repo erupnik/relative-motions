@@ -21,9 +21,9 @@
     Hi =  J_rt_RT^t @  H_i  @ J_rt_RT
     gi =  J_rt_RT^t @ g_i
 
-    H = | H1       |   => can become big for Nk images so think of sparse matrices
-        |    H2    |
-        |       H3 |
+    H = SUM |         |   => can become big for Nk images so think of sparse matrices
+            |   Hi    |
+            |         |
 
     where,
     J_rt_RT = [ J_rt_R | 0      ]    jacobian
@@ -51,9 +51,17 @@
         [R+,T+] = exp(delta)^T * [R | T]
 
 */
+Mat3d skew_symmetric(Vec3d w)
+{
+  Mat3d ss_mat;
+  ss_mat << 0, -w[2], w[1],
+            w[2], 0, -w[0],
+           -w[1], w[0], 0;
 
+  return ss_mat;
+}
 
-void test_gen_2motions(cNviewPose* motion_1,cNviewPose* motion_2)
+void test_gen_2motions(cNviewPoseT<Mat6d,Vec6d>*& motion_1,cNviewPoseT<Mat12d,Vec12d>*& motion_2)
 {
     //relative poses
     //motion1
@@ -80,9 +88,10 @@ void test_gen_2motions(cNviewPose* motion_1,cNviewPose* motion_2)
                0, -11.6732,-69.0993, -50.4043, 89113.6, 99.535,
                0, 23.0635, -2.56514, 103.143, 99.535, 86756.9;
     Vec6d gradient2;
-    gradient2 << 0, 0.0829167, 0.021951, 0.738334, -0.0964338, 0.18924;
+    gradient2 << 0, 0.0829167, 0.021951, 0.738334, -0.0964338, 0.18924;//0.18924;
 
-    cHessianGradient2 * aHg2 = new cHessianGradient2(hessian2,gradient2);
+    //cHessianGradient2 * aHg2 = new cHessianGradient2(hessian2,gradient2);
+    cHessianGradientN<Mat6d,Vec6d> * aHgN = new cHessianGradientN<Mat6d,Vec6d>(hessian2,gradient2);
     //aHg->printH();
 
     //affine transformation
@@ -95,7 +104,7 @@ void test_gen_2motions(cNviewPose* motion_1,cNviewPose* motion_2)
     beta_m1 << 1.45337, 0.782566, 4.01418;
     double s_m1 = 2.50449;
 
-    motion_1 = new c2viewPose_(pose3_m1,pose4_m1,aHg2);
+    motion_1 = (new cNviewPoseT<Mat6d,Vec6d>(pose3_m1,pose4_m1,NULL,aHgN));
     motion_1->lambda() = s_m1;
     motion_1->alpha() = alpha_m1;
     motion_1->beta() = beta_m1;
@@ -146,7 +155,9 @@ void test_gen_2motions(cNviewPose* motion_1,cNviewPose* motion_2)
                 0.227898, 0.103299, 0.344239,
                 0.304507, -0.314465, -0.0427875;
 
-    cHessianGradient3 * aHg3 = new cHessianGradient3(hessian3,gradient3);
+
+    cHessianGradientN<Mat12d,Vec12d> * aHgN_ =
+                     new cHessianGradientN<Mat12d,Vec12d>(hessian3,gradient3);
 
     //affine transformation
     Mat3d alpha_m2;
@@ -159,7 +170,7 @@ void test_gen_2motions(cNviewPose* motion_1,cNviewPose* motion_2)
     double s_m2 = 1.52224;
 
 
-    motion_2 = new c3viewPose_(pose2_m2,pose3_m2,pose4_m2,aHg3);
+    motion_2 = (new cNviewPoseT<Mat12d,Vec12d>(pose2_m2,pose3_m2,pose4_m2,aHgN_));
     motion_2->lambda() = s_m2;
     motion_2->alpha() = alpha_m2;
     motion_2->beta() = beta_m2;
@@ -171,6 +182,50 @@ void test_gen_2motions(cNviewPose* motion_1,cNviewPose* motion_2)
     motion_1->View(1).Show();
     motion_2->View(2).Show();
 
+}
+
+void test_propagate_cov(cNviewPoseT<Mat6d,Vec6d>*& motion_1)
+{
+  Mat3d J_rt_T = motion_1->lambda() * motion_1->alpha();
+  Mat3d skew_sym = skew_symmetric(Vec3d::Ones());
+  Mat3d J_rt_R = motion_1->alpha() * skew_sym;
+
+  Mat6d J_rt_RT = Mat6d::Zero();
+  J_rt_RT.block(0,0,3,3) = J_rt_T;
+  J_rt_RT.block(3,3,3,3) = J_rt_R;
+
+  //std::cout << "\nJ_rt_RT\n" << J_rt_RT << '\n';
+  //std::cout << "\nmotion_1->Hg_().H_()\n" << motion_1->Hg_().H_() << '\n';
+
+  Mat6d JtHJ = J_rt_RT.transpose() * motion_1->Hg_().H_() * J_rt_RT;
+  //std::cout << "\nJtHJ\n" << JtHJ << '\n';
+  motion_1->Hg_().H_() = JtHJ;
+  motion_1->Hg_().g_() = J_rt_RT.transpose() * motion_1->Hg_().g_();
+  std::cout << "\nmotion_1->Hg_().H_()\n" << motion_1->Hg_().H_() << '\n';
+  std::cout << "\n =============================\n";
+}
+
+void test_propagate_cov(cNviewPoseT<Mat12d,Vec12d>*& motion)
+{
+  Mat3d skew_sym = skew_symmetric(Vec3d::Ones());
+  Mat3d J_rt_T = motion->lambda() * motion->alpha();
+  Mat3d J_rt_R = motion->alpha() * skew_sym;
+
+  Mat12d J_rt_RT = Mat12d::Zero();
+  J_rt_RT.block(0,0,3,3) = J_rt_T;
+  J_rt_RT.block(3,3,3,3) = J_rt_R;
+  J_rt_RT.block(6,6,3,3) = J_rt_T;
+  J_rt_RT.block(9,9,3,3) = J_rt_R;
+
+  //std::cout << "\nJ_rt_RT\n" << J_rt_RT << '\n';
+  //std::cout << "\nmotion->Hg_().H_()\n" << motion->Hg_().H_() << '\n';
+
+  Mat12d JtHJ = J_rt_RT.transpose() * motion->Hg_().H_() * J_rt_RT;
+  //std::cout << "\nJtHJ\n" << JtHJ << '\n';
+  motion->Hg_().H_() = JtHJ;
+  motion->Hg_().g_() = J_rt_RT.transpose() * motion->Hg_().g_();
+  std::cout << "\nmotion->Hg_().H_()\n" << motion->Hg_().H_() << '\n';
+  std::cout << "\n =============================\n";
 }
 
 void test_similarity_trafo()
@@ -336,7 +391,6 @@ RELATIVE POSES (pose_i_j)
 
 }
 
-
 void gen_toy_problem_triplet(cPoseBasic* P1,cPoseBasic* P2,cPoseBasic* P3)
 {
 
@@ -411,27 +465,91 @@ int main_check_similarity_trafo(int argc,char** argv)
     return true;
 }
 
+/* std::map<std::string,cPoseBasic*> aGlobalPoses;
+
+//aNViewMap["0003.png-0004.png"] = motion_34;
+//aNViewMap["0002.png-0003.png-0004.png"] = motion_234;
+
+Mat3d R2;
+R2 << -0.834751, -0.00355065, -0.550616,
+      -0.0240994, 0.999257, 0.0300918,
+       0.5501, 0.0383887, -0.834216;
+Vec3d T2;
+T2 << 1.34453, -0.452846, 1.41262;
+cPoseBasic* P2 = new cPoseBasic(R2,T2,"0002.png");
+
+Mat3d R3;
+R3 << -0.943896, 0.0443111, -0.327256,
+       0.0325787, 0.998618, 0.0412491,
+       0.328632, 0.0282732, -0.944035;
+Vec3d T3;
+T3 <<  1.05797, -0.397735, 1.31378;
+cPoseBasic* P3 = new cPoseBasic(R3,T3,"0003.png");
+
+Mat3d R4;
+R4 << -0.978396, 0.0762443, -0.192168,
+       0.0635704, 0.995428, 0.0712851,
+       0.196724, 0.0575289, -0.97877;
+Vec3d T4;
+T4 << 0.675793, -0.394214, 1.42934;
+cPoseBasic* P4 = new cPoseBasic(R4,T4,"0004.png");
+
+aGlobalPoses["0002.png"] = P2;
+aGlobalPoses["0003.png"] = P3;
+aGlobalPoses["0004.png"] = P4;
+
+std::cout << aGlobalPoses.size() << "\n"; */
 int main_check_propagation(int argc,char** argv)
 {
 
   // Generate toy dataset
-  cNviewPose* motion_1 =0;
-  cNviewPose* motion_2 =0;
-  test_gen_2motions(motion_1,motion_2);
+  cNviewPoseT<Mat6d,Vec6d>* motion_34 =0;
+  cNviewPoseT<Mat12d,Vec12d>* motion_234 =0;
+  test_gen_2motions(motion_34,motion_234);
 
-  std::cout << "\n eeeee\n";
-  //motion_1->PrintAlpha();
-  motion_1->Hg_().printH();
-  //motion_2->Hg_().printH();
-  /* Solve for delta */
 
-  /* Update */
+  /* Propagate covariance to global frame  */
+  //first motion
+  test_propagate_cov(motion_34);
+  //second motion
+  test_propagate_cov(motion_234);
 
-  /* Print / save */
+
+  /* Accumulate H and g */
+  Mat18d global_H = Mat18d::Zero();
+  Vec18d global_g = Vec18d::Zero();
+
+  global_H.block(12,12,6,6) += motion_34->Hg_().H_();
+  global_H.block(6,6,12,12) += motion_234->Hg_().H_();
+  std::cout << "\n H \n" << global_H;
+
+  global_g.block(12,0,6,1) += motion_34->Hg_().g_();
+  global_g.block(6,0,12,1) += motion_234->Hg_().g_();
+  std::cout << "\n g \n" << global_g  << "\n";
+
+  /* Solve for delta
+     delta =  H^-1 @ g    18 x 1
+ */
+ Vec18d delta = global_H.inverse() * global_g;
+ std::cout << "delta=\n" << delta << "\n";
+
+
+  /* Update
+    Pose+ = exp(delta)^T * Pose
+    [R+,T+] = exp(delta)^T * [R | T]
+
+    T_delta = from_Rt(so3exp_map(aa), t)
+    T = T_delta @ T
+
+    so3exp_map
+
+  */
+
 
   return true;
 
 }
+
 
 
 int main(int argc, char** argv)

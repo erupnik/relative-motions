@@ -1,0 +1,2 @@
+/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/bin/cov_in_motions
+/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/bin/bench

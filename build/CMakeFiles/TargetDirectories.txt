@@ -1,0 +1,8 @@
+/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/build/CMakeFiles/install/strip.dir
+/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/build/CMakeFiles/install/local.dir
+/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/build/CMakeFiles/bench.dir
+/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/build/CMakeFiles/cov_in_motions.dir
+/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/build/CMakeFiles/edit_cache.dir
+/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/build/CMakeFiles/rebuild_cache.dir
+/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/build/CMakeFiles/list_install_components.dir
+/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/build/CMakeFiles/install.dir
