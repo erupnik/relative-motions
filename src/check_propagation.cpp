@@ -533,6 +533,8 @@ int main_check_propagation(int argc,char** argv)
  Vec18d delta = global_H.inverse() * global_g;
  std::cout << "delta=\n" << delta << "\n";
 
+ Eigen::FullPivLU<Eigen::MatrixXd> lu_decomp(global_H);
+ std::cout << "The rank of global_H is " << lu_decomp.rank() << "\n"; 
 
   /* Update
     Pose+ = exp(delta)^T * Pose

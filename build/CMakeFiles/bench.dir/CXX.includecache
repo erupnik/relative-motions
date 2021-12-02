@@ -63,6 +63,8 @@ cov_in_motions.h
 /home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/src/cov_in_motions.h
 Eigen/IterativeLinearSolvers
 -
+Eigen/Dense
+-
 
 /usr/local/include/ceres/autodiff_cost_function.h
 memory

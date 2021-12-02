@@ -251,7 +251,7 @@ class cNviewPoseX
 
     int                                  mNbV;
     bool                                 _COV_PROP;
-
+ 
 };
 
 class cAppCovInMotion

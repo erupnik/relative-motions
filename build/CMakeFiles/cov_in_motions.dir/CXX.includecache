@@ -57,6 +57,8 @@ cov_in_motions.h
 /home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/src/cov_in_motions.h
 Eigen/IterativeLinearSolvers
 -
+Eigen/Dense
+-
 
 /home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/src/main.cpp
 all.h
