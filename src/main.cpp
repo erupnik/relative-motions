@@ -1,39 +1,50 @@
 #include "all.h"
 
-extern int cov_in_motions_main(int argc, char** argv);
 
-void PrintHelp(std::string aArg)
-{
-    std::cerr << "Usage: " << aArg << " "
-              << "Options:\n"
-              << "\t-h,--help\tShow this help message\n"
-              << "\trelm.txt \tmotion file\n"
-              << "\tcoords.txt\t2d coordinate file\n";
-            //  << "\tShow?\t 1 or 0 for verbose print"
-}
+DEFINE_string(views_file,
+              "",
+              "The file containing relative motions");
+DEFINE_string(tracks_file,
+              "",
+              "The file containing tracks (image features)");
+DEFINE_string(similarities_file,
+              "",
+              "The file containing the 3D similarities between the relative and global poses");
+DEFINE_string(global_poses_file,
+              "",
+              "The file containing the inital global poses");
+DEFINE_bool(covariance,
+              false,
+              "Compute covariance matrices per motions");
+
+
+extern int cov_in_motions_main(std::string,
+                               std::string,
+                               std::string,
+                               std::string,
+                               bool);
+
 
 int main(int argc, char** argv)
 {
-  std::cout << "cov_in_motions" << "\n";
 
-  if (argc < 2)
-  {
-    PrintHelp(argv[0]);
-    std::cout << argc << "\n";
-    return 1;
-  }
+  FLAGS_log_dir = "./";
 
-  std::string aArg1 = std::string(argv[1]);
+  google::InitGoogleLogging(argv[0]);
+  GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, true);
 
-  if ((aArg1 == "-h") || (aArg1 == "--help") || (aArg1 == "-help"))
-  {
-      std::cout << aArg1 << "\n";
-      PrintHelp(argv[0]);
-      return 1;
-  }
+  LOG(INFO) << "cov_in_motions --views_file=" << FLAGS_views_file
+            << " --tracks_file=" << FLAGS_tracks_file
+            << " --similarities_file=" << FLAGS_similarities_file
+            << " --global_poses_file=" << FLAGS_global_poses_file
+            << " --covariance=" << FLAGS_covariance;
 
 
-  return cov_in_motions_main(argc,argv);
+  return cov_in_motions_main(FLAGS_views_file,
+                             FLAGS_tracks_file,
+                             FLAGS_similarities_file,
+                             FLAGS_global_poses_file,
+                             FLAGS_covariance);
 
 
 }

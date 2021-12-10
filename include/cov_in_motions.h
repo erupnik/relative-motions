@@ -71,6 +71,9 @@ class cPose : public cPoseGen //any pose, relative or absolute
              memset(mCov_C, 0, sizeof(int)*9);
              memset(mCov_Omega, 0, sizeof(int)*9);
              mC_ << mC[0], mC[1], mC[2];
+             mOmega[0] = 0;//_ETA* double(std::rand()) / RAND_MAX;
+             mOmega[1] = 0;//_ETA*double(std::rand()) / RAND_MAX;
+             mOmega[2] = 0;//_ETA*double(std::rand()) / RAND_MAX;
            }
         ~cPose(){}
 
@@ -251,7 +254,7 @@ class cNviewPoseX
 
     int                                  mNbV;
     bool                                 _COV_PROP;
- 
+
 };
 
 class cAppCovInMotion
@@ -260,7 +263,8 @@ class cAppCovInMotion
     cAppCovInMotion(const std::string& ,
                     const std::string&,
                     const std::string&,
-                    const std::string& );
+                    const std::string&,
+                    const bool );
 
   private:
     bool ReadFeatures();
@@ -292,10 +296,10 @@ class cAppCovInMotion
     std::string mfeats_file;
     std::string msimil_file;
     std::string mglob_p_file;
+    bool        GET_COVARIANCES;
 
     /* relative motions and global poses */
-    std::map<std::string,cNviewPoseX*>   m2ViewMap_;//ok
-    std::map<std::string,cNviewPoseX*> m3ViewMap_;//ok
+    std::map<std::string,cNviewPoseX*>   mAllViewMap_;//ok
 
     //std::map<std::string,c2viewPose*> m2ViewMap;//ok
     //std::map<std::string,c3viewPose*> m3ViewMap;//ok

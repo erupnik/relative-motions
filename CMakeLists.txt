@@ -14,6 +14,8 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 find_package(Ceres REQUIRED)
 include_directories(${CERES_INCLUDE_DIRS})
 
+#find_package(glog)
+find_package(gflags)
 
 #OPTION(WITH_G2O "Build g2o" OFF)
 #if (WITH_G2O)
@@ -36,8 +38,8 @@ add_executable(${PROJECT_NAME} "src/main.cpp" "src/cov_in_motions.cpp" "src/bund
 add_executable("bench" "src/check_propagation.cpp" "src/cov_in_motions.cpp" "src/bundle.cpp" )
 
 
-target_link_libraries(${PROJECT_NAME} ${CERES_LIBRARIES}) #
-target_link_libraries("bench" ${CERES_LIBRARIES}) #
+target_link_libraries(${PROJECT_NAME} ${CERES_LIBRARIES} ) #
+target_link_libraries("bench" ${CERES_LIBRARIES} ) #
 
 install (TARGETS ${PROJECT_NAME} DESTINATION ${INSTALL_DIR})
 install (TARGETS "bench" DESTINATION ${INSTALL_DIR})

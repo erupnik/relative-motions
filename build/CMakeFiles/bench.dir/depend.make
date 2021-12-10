@@ -335,9 +335,6 @@ CMakeFiles/bench.dir/src/bundle.cpp.o: /usr/local/include/eigen3/Eigen/src/plugi
 CMakeFiles/bench.dir/src/bundle.cpp.o: /usr/local/include/eigen3/Eigen/src/plugins/CommonCwiseUnaryOps.h
 CMakeFiles/bench.dir/src/bundle.cpp.o: /usr/local/include/eigen3/Eigen/src/plugins/MatrixCwiseBinaryOps.h
 CMakeFiles/bench.dir/src/bundle.cpp.o: /usr/local/include/eigen3/Eigen/src/plugins/MatrixCwiseUnaryOps.h
-CMakeFiles/bench.dir/src/bundle.cpp.o: /usr/local/include/glog/log_severity.h
-CMakeFiles/bench.dir/src/bundle.cpp.o: /usr/local/include/glog/logging.h
-CMakeFiles/bench.dir/src/bundle.cpp.o: /usr/local/include/glog/vlog_is_on.h
 
 CMakeFiles/bench.dir/src/check_propagation.cpp.o: ../include/all.h
 CMakeFiles/bench.dir/src/check_propagation.cpp.o: ../include/bundle.h
@@ -674,9 +671,6 @@ CMakeFiles/bench.dir/src/check_propagation.cpp.o: /usr/local/include/eigen3/Eige
 CMakeFiles/bench.dir/src/check_propagation.cpp.o: /usr/local/include/eigen3/Eigen/src/plugins/CommonCwiseUnaryOps.h
 CMakeFiles/bench.dir/src/check_propagation.cpp.o: /usr/local/include/eigen3/Eigen/src/plugins/MatrixCwiseBinaryOps.h
 CMakeFiles/bench.dir/src/check_propagation.cpp.o: /usr/local/include/eigen3/Eigen/src/plugins/MatrixCwiseUnaryOps.h
-CMakeFiles/bench.dir/src/check_propagation.cpp.o: /usr/local/include/glog/log_severity.h
-CMakeFiles/bench.dir/src/check_propagation.cpp.o: /usr/local/include/glog/logging.h
-CMakeFiles/bench.dir/src/check_propagation.cpp.o: /usr/local/include/glog/vlog_is_on.h
 
 CMakeFiles/bench.dir/src/cov_in_motions.cpp.o: ../include/all.h
 CMakeFiles/bench.dir/src/cov_in_motions.cpp.o: ../include/bundle.h
@@ -1013,7 +1007,4 @@ CMakeFiles/bench.dir/src/cov_in_motions.cpp.o: /usr/local/include/eigen3/Eigen/s
 CMakeFiles/bench.dir/src/cov_in_motions.cpp.o: /usr/local/include/eigen3/Eigen/src/plugins/CommonCwiseUnaryOps.h
 CMakeFiles/bench.dir/src/cov_in_motions.cpp.o: /usr/local/include/eigen3/Eigen/src/plugins/MatrixCwiseBinaryOps.h
 CMakeFiles/bench.dir/src/cov_in_motions.cpp.o: /usr/local/include/eigen3/Eigen/src/plugins/MatrixCwiseUnaryOps.h
-CMakeFiles/bench.dir/src/cov_in_motions.cpp.o: /usr/local/include/glog/log_severity.h
-CMakeFiles/bench.dir/src/cov_in_motions.cpp.o: /usr/local/include/glog/logging.h
-CMakeFiles/bench.dir/src/cov_in_motions.cpp.o: /usr/local/include/glog/vlog_is_on.h
 

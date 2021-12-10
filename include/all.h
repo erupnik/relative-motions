@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 #include <map>
-
+#include <ctime>
 
 #include "Eigen/Core"
 #include "Eigen/Dense"
@@ -28,5 +28,7 @@ typedef Eigen::Matrix<double,3,1> Vec3d;
 typedef Eigen::Matrix<double,2,1> Vec2d;
 
 #include <constants.h>
+
+#include "glog/logging.h"
 
 #endif //_ALL_H

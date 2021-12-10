@@ -143,7 +143,7 @@ cov_in_motions: CMakeFiles/cov_in_motions.dir/src/cov_in_motions.cpp.o
 cov_in_motions: CMakeFiles/cov_in_motions.dir/src/bundle.cpp.o
 cov_in_motions: CMakeFiles/cov_in_motions.dir/build.make
 cov_in_motions: /usr/local/lib/libceres.a
-cov_in_motions: /usr/local/lib/libglog.so
+cov_in_motions: /usr/lib/x86_64-linux-gnu/libglog.so
 cov_in_motions: /usr/lib/x86_64-linux-gnu/libgflags.so.2.2.1
 cov_in_motions: /usr/lib/x86_64-linux-gnu/libspqr.so
 cov_in_motions: /usr/lib/x86_64-linux-gnu/libtbb.so

@@ -55,10 +55,6 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
 file(INSTALL DESTINATION "/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/bin" TYPE EXECUTABLE FILES "/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/build/cov_in_motions")
   if(EXISTS "$ENV{DESTDIR}/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/bin/cov_in_motions" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/bin/cov_in_motions")
-    file(RPATH_CHANGE
-         FILE "$ENV{DESTDIR}/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/bin/cov_in_motions"
-         OLD_RPATH "/usr/local/lib:"
-         NEW_RPATH "")
     if(CMAKE_INSTALL_DO_STRIP)
       execute_process(COMMAND "/usr/bin/strip" "$ENV{DESTDIR}/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/bin/cov_in_motions")
     endif()
@@ -83,10 +79,6 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
 file(INSTALL DESTINATION "/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/bin" TYPE EXECUTABLE FILES "/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/build/bench")
   if(EXISTS "$ENV{DESTDIR}/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/bin/bench" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/bin/bench")
-    file(RPATH_CHANGE
-         FILE "$ENV{DESTDIR}/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/bin/bench"
-         OLD_RPATH "/usr/local/lib:"
-         NEW_RPATH "")
     if(CMAKE_INSTALL_DO_STRIP)
       execute_process(COMMAND "/usr/bin/strip" "$ENV{DESTDIR}/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/bin/bench")
     endif()

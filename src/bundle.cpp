@@ -49,6 +49,8 @@ bool cResidualOnPose::operator()(const T* const aW,
     Residual[0] = (xPi - mPtBundle(0,0))/mPdsSqrt;
     Residual[1] = (yPi - mPtBundle(1,0))/mPdsSqrt;
 
+
+
     return true;
 }
 
@@ -101,7 +103,14 @@ bool cResidualError::operator()(const T* const aW,
     Residual[0] = (xPi - mPtBundle(0,0))/mPdsSqrt;
     Residual[1] = (yPi - mPtBundle(1,0))/mPdsSqrt;
 
-    //std::cout << Residual[0] << " " << Residual[1] << ", bunP=" << xPi << "," << xPi << ", bunO=" << mPtBundle.transpose() <<  "\n";
+
+    std::cout << "eee\n W " << Wx << " " << Wy << " " << Wz << "\n"
+              << "C "   << aC[0] << " " << aC[1] << " " << aC[2] << "\n"
+              << "Pt3 " << aPt3d[0] << " " << aPt3d[1] << " " << aPt3d[2] << "\n"
+              << "Rot\n" << mRot0 << "\n";
+
+    std::cout << Residual[0] << " " << Residual[1] << ", bunP=" << xPi << "," << yPi
+              << ", bunO=" << mPtBundle.transpose() <<  "-" << mPtBundle(0,0) << " " << mPtBundle(1,0) <<  "\n";
     return true;
 
 }

@@ -143,7 +143,7 @@ bench: CMakeFiles/bench.dir/src/cov_in_motions.cpp.o
 bench: CMakeFiles/bench.dir/src/bundle.cpp.o
 bench: CMakeFiles/bench.dir/build.make
 bench: /usr/local/lib/libceres.a
-bench: /usr/local/lib/libglog.so
+bench: /usr/lib/x86_64-linux-gnu/libglog.so
 bench: /usr/lib/x86_64-linux-gnu/libgflags.so.2.2.1
 bench: /usr/lib/x86_64-linux-gnu/libspqr.so
 bench: /usr/lib/x86_64-linux-gnu/libtbb.so

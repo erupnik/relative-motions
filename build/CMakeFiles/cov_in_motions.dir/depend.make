@@ -335,9 +335,6 @@ CMakeFiles/cov_in_motions.dir/src/bundle.cpp.o: /usr/local/include/eigen3/Eigen/
 CMakeFiles/cov_in_motions.dir/src/bundle.cpp.o: /usr/local/include/eigen3/Eigen/src/plugins/CommonCwiseUnaryOps.h
 CMakeFiles/cov_in_motions.dir/src/bundle.cpp.o: /usr/local/include/eigen3/Eigen/src/plugins/MatrixCwiseBinaryOps.h
 CMakeFiles/cov_in_motions.dir/src/bundle.cpp.o: /usr/local/include/eigen3/Eigen/src/plugins/MatrixCwiseUnaryOps.h
-CMakeFiles/cov_in_motions.dir/src/bundle.cpp.o: /usr/local/include/glog/log_severity.h
-CMakeFiles/cov_in_motions.dir/src/bundle.cpp.o: /usr/local/include/glog/logging.h
-CMakeFiles/cov_in_motions.dir/src/bundle.cpp.o: /usr/local/include/glog/vlog_is_on.h
 
 CMakeFiles/cov_in_motions.dir/src/cov_in_motions.cpp.o: ../include/all.h
 CMakeFiles/cov_in_motions.dir/src/cov_in_motions.cpp.o: ../include/bundle.h
@@ -674,9 +671,6 @@ CMakeFiles/cov_in_motions.dir/src/cov_in_motions.cpp.o: /usr/local/include/eigen
 CMakeFiles/cov_in_motions.dir/src/cov_in_motions.cpp.o: /usr/local/include/eigen3/Eigen/src/plugins/CommonCwiseUnaryOps.h
 CMakeFiles/cov_in_motions.dir/src/cov_in_motions.cpp.o: /usr/local/include/eigen3/Eigen/src/plugins/MatrixCwiseBinaryOps.h
 CMakeFiles/cov_in_motions.dir/src/cov_in_motions.cpp.o: /usr/local/include/eigen3/Eigen/src/plugins/MatrixCwiseUnaryOps.h
-CMakeFiles/cov_in_motions.dir/src/cov_in_motions.cpp.o: /usr/local/include/glog/log_severity.h
-CMakeFiles/cov_in_motions.dir/src/cov_in_motions.cpp.o: /usr/local/include/glog/logging.h
-CMakeFiles/cov_in_motions.dir/src/cov_in_motions.cpp.o: /usr/local/include/glog/vlog_is_on.h
 
 CMakeFiles/cov_in_motions.dir/src/main.cpp.o: ../include/all.h
 CMakeFiles/cov_in_motions.dir/src/main.cpp.o: ../include/constants.h

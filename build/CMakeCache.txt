@@ -194,10 +194,13 @@ EIGEN_INCLUDE_DIR:STRING=/usr/local/include/eigen3
 Eigen3_DIR:PATH=/usr/local/share/eigen3/cmake
 
 //Path to a file.
-GLOG_INCLUDE_DIR:PATH=/usr/local/include
+GLOG_INCLUDE_DIR:PATH=/usr/include
 
 //Path to a library.
-GLOG_LIBRARY:FILEPATH=/usr/local/lib/libglog.so
+GLOG_LIBRARY:FILEPATH=/usr/lib/x86_64-linux-gnu/libglog.so
+
+//The directory containing a CMake configuration file for Glog.
+Glog_DIR:PATH=Glog_DIR-NOTFOUND
 
 //Value Computed by CMake
 cov_in_motions_BINARY_DIR:STATIC=/home/er/Documents/d_development/structureless_BA/prop_cov/code/relative-motions/build
@@ -207,6 +210,9 @@ cov_in_motions_SOURCE_DIR:STATIC=/home/er/Documents/d_development/structureless_
 
 //The directory containing a CMake configuration file for gflags.
 gflags_DIR:PATH=/usr/lib/x86_64-linux-gnu/cmake/gflags
+
+//The directory containing a CMake configuration file for glog.
+glog_DIR:PATH=/usr/local/lib/cmake/Ceres
 
 
 ########################
@@ -366,6 +372,16 @@ Eigen3_DIR-ADVANCED:INTERNAL=1
 FIND_PACKAGE_MESSAGE_DETAILS_Threads:INTERNAL=[TRUE][v()]
 //ADVANCED property for variable: GLOG_INCLUDE_DIR
 GLOG_INCLUDE_DIR-ADVANCED:INTERNAL=1
+//MODIFIED property for variable: GLOG_INCLUDE_DIR
+GLOG_INCLUDE_DIR-MODIFIED:INTERNAL=ON
 //ADVANCED property for variable: GLOG_LIBRARY
 GLOG_LIBRARY-ADVANCED:INTERNAL=1
+//MODIFIED property for variable: GLOG_LIBRARY
+GLOG_LIBRARY-MODIFIED:INTERNAL=ON
+//MODIFIED property for variable: Glog_DIR
+Glog_DIR-MODIFIED:INTERNAL=ON
+//ADVANCED property for variable: glog_DIR
+glog_DIR-ADVANCED:INTERNAL=1
+//MODIFIED property for variable: glog_DIR
+glog_DIR-MODIFIED:INTERNAL=ON
 
