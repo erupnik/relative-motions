@@ -409,7 +409,7 @@ bool cAppCovInMotion::ReadFeatures()
 /*********** MANAGER CLASS  *******************/
 bool cAppCovInMotion::ReadViews()
 {
-  std::srand(std::time(nullptr));
+  //std::srand(std::time(nullptr));
 
   FILE* fptr = fopen(mviews_file.c_str(), "r");
   if (fptr == NULL) {
