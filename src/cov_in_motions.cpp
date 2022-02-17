@@ -12,9 +12,9 @@
   - DONE finish propagation test
   - DONE fix ReadSimGlob to update new variables
   - check inputs:
-      + edges: 
-      + similarities: computed between edges and Ori  
-      + global poses: from input Ori  
+      + edges:
+      + similarities: computed between edges and Ori
+      + global poses: from input Ori
   - parallellize
 
  NOTES:
@@ -68,13 +68,22 @@
     // - P and P_ are 3D pts in relative and absolute frames respectively
      res = ( Fn(P) - p )                                 //local
          =   I(Proj(          pose(P)           )) -p    //local
-         =   I(Proj(  alpha * Pose(P_) + beta   )) -p    //
+         =   I(Proj( s * alpha * Pose(P_) + beta   )) -p    //
+
+         = I(Proj( simil( Pose(P_) ) )) => global   ->   local     ->   projection  -> calib
+                                          (p3d^g)    s   (p3d^l)  proj    (p3q)     I  (p2d)
+
+    derivatives (2months later),
+         (alpha,beta) are constants:
+           res' =  J_p2d_p3q @ J_p3q_p3d^l @ J_p3d^l_rt @ J_rt_RT
+         (alpha,beta) are NOT constants:
+           res' =  J_p2d_p3q @ J_p3q_p3d^l @ J_p3d^l_rt @ J_rt_simil @ J_simil_RT
 
     J = d_res/d_delta =
-             d_Fn / d_delta = d_I/d_(Xq,Yq) @
-                              d_Proj/d_(Xc,Yc,Zc) @
-                              d_pose/d_(r,t) @
-                              d_Pose/d_(R,T)
+             d_Fn / d_delta = d_I/d_(Xq,Yq) @               //
+                              d_Proj/d_(Xc,Yc,Zc) @         //
+                              d_pose/d_(r,t) @              //============
+                              d_Pose/d_(R,T)                //
                             = J_p2d_p3q @ J_p3q_p3d @ J_p3d_rt @ J_rt_RT
                             = J_ @ J_rt_RT
 
@@ -229,7 +238,6 @@ bool cNviewPoseT<T,U>::propagate_cov()
     skew_sym << 0, -1, 1,
                 1, 0, -1,
                -1, 1, 0;
-
     Mat3d J_rt_R = affine_trafo.alpha * skew_sym;
 
     T J_rt_RT = T::Zero();
@@ -258,12 +266,15 @@ bool cNviewPoseX::propagate_cov()
 
     Mat3d J_rt_T = affine_trafo.lambda * affine_trafo.alpha;
 
-    Mat3d skew_sym;
-    skew_sym << 0, -1, 1,
+    //Mat3d skew_sym;
+    /*skew_sym << 0, -1, 1,
                 1, 0, -1,
-               -1, 1, 0;
-
-    Mat3d J_rt_R = affine_trafo.alpha * skew_sym;
+               -1, 1, 0;*/
+    /*skew_sym << 1, 0, 0,
+                0, 1, 0,
+                0, 0, 1;
+    Mat3d J_rt_R = affine_trafo.alpha * skew_sym;*/
+    Mat3d J_rt_R = J_rt_T;
 
     int rc = _GAUGE_FIRST_CAM_FIX ? 6*(NbView()-1) : 6*NbView();
 
@@ -748,7 +759,7 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
               CostFunction * aCostF = cResidualError::Create( aR0,
                                                               aFeat2d->at(aK).at(aCam),
                                                               _FEAT_PDS);
-              LossFunction * aLossF = new HuberLoss(0.0003);
+              LossFunction * aLossF = new HuberLoss(1.00);
               aProblem->AddResidualBlock(aCostF,aLossF,
                                          aW, aC, aFeat3d->at(aK));
           }
@@ -802,7 +813,7 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
       // "rappel" on the poses
       if (_GAUGE_RAPPEL_POSES)
       {
-        if (_GAUGE_FIRST_CAM_FIX && aCam==0)  
+        if (_GAUGE_FIRST_CAM_FIX && aCam==0)
         {
             std::cout << "rappel pose cam0?\n" ;
             getchar();
@@ -829,7 +840,7 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
             //std::cout << "_GAUGE_RAPPEL_POSES" << "\n";
         }
       }
-        
+
   }
 
     //solve the least squares problem
@@ -869,18 +880,17 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
 
 
     //hessian and gradient vector
-    int base_offset = (_GAUGE_BASE_FIX) ? 1 : 0;
 
     Eigen::SparseMatrix<double> A = MapJacToSparseM(aJ);
     Eigen::SparseMatrix<double> JtWJ = (A.transpose()*A);
-    std::cout << "Jacobian:\n" << A << "\n";
+    //std::cout << "Jacobian:\n" << A << "\n";
 
     //map to MatXd
     int JtWJ__size = _GAUGE_FIRST_CAM_FIX ? 6*(views->NbView()-1) : 6*views->NbView();
     //std::cout << "JtWJ__size " << JtWJ__size << " JtWJ " << JtWJ.rows() << " " <<  JtWJ.cols() << "\n";
     MatXd JtWJ_ = MatXd::Zero(JtWJ__size,JtWJ__size);
 
-    MapJacToEigMat(JtWJ,JtWJ_,base_offset);//offset 1 bc tx is the constant base
+    MapJacToEigMat(JtWJ,JtWJ_,((_GAUGE_BASE_FIX) ? 1 : 0));//offset 1 bc tx is the constant base
 
     if (_GAUGE_BASE_FIX)
     {
@@ -891,11 +901,23 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
     Eigen::VectorXd my_vect = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(JtWres.data(), JtWres.size());//fixed-size to dynamic
     views->Hg_() = *(new cHessianGradientX(JtWJ_,my_vect));
 
+    bool checkRank = false;
+    if (checkRank)
+    {
+
+        Eigen::FullPivLU<Eigen::MatrixXd> lu_decomp(views->Hg_().H_());
+        std::cout << "\nThe rank of A is " << lu_decomp.rank()
+                  << ", det=" << views->Hg_().H_().determinant() << "\n";
+
+    }
+
     if (VLOG_IS_ON(2))
     {
         VLOG(2) << "Bundle adjustment SUCCESS: " << eval_success;
         VLOG(2) << "\n" << views_name
-                  << "\nHHHHHHHHHHHHHHHHHHHHHHHh\n" << JtWJ_;
+                << " _GAUGE_BASE_FIX=" << _GAUGE_BASE_FIX << ", "
+                << " _GAUGE_FIRST_CAM_FIX=" <<  _GAUGE_FIRST_CAM_FIX << " "
+                << "\nHHHHHHHHHHHHHHHHHHHHHHHh\n" << JtWJ_;
         //views->Hg_().printH();
         VLOG(2) << "\nggggggggggggggggggggggggggggg\n" << my_vect;
         //views->Hg_().printG();
@@ -925,6 +947,15 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
       //print
       if (1)
       {
+        std::cout << "hessian\n";
+        for (int aK1=0; aK1<aJ->num_cols; aK1++)
+        {
+          for (int aK2=0; aK2<aJ->num_cols; aK2++)
+          {
+              std::cout << JtWJ.coeffRef(aK1,aK2) << " ";
+          }
+          std::cout << "\n";
+        }
         std::cout << "covariance\n";
         for (int aK1=0; aK1<aJ->num_cols; aK1++)
         {
@@ -1087,10 +1118,10 @@ bool cAppCovInMotion::OptimizeGlobally()
     {
         int Hg_size = (poses_in_motions.size())*6;
         std::cout << "\nGlobal hessian size: " << Hg_size << "\n";
- 
+
         Eigen::MatrixXd H_global = Eigen::MatrixXd::Zero(Hg_size,Hg_size);
         Eigen::VectorXd g_global = Eigen::VectorXd::Zero(Hg_size);
- 
+
         for (auto a3v : mAllViewMap_)
         {
             int NumView = a3v.second->NbView();
@@ -1102,35 +1133,80 @@ bool cAppCovInMotion::OptimizeGlobally()
                     int glob_id = 6* poses_in_motions[a3v.second->View(vi).Name()];
                     int loc_id = (vi-start_cam_id)*6;
  	   			//std::cout << "VIEW3 " << glob_id << " " << loc_id << "\n";
- 
+
                     //std::cout << a3v.second->View(vi).Name() << " "  << glob_id <<  "\n";
                     //std::cout << "loc_id=" << a3v.second->Hg_().g_().rows() << "/" << loc_id << "\n";
- 
+
                     H_global.block(glob_id,glob_id,6,6) += a3v.second->Hg_().H_().block(loc_id,loc_id,6,6);
                     g_global.block(glob_id,0,6,1) += a3v.second->Hg_().g_().block(loc_id,0,6,1);
- 
+
                     //std::cout << "H_global current\n" << H_global << "\n";
- 
-                    //a3v.second->Hg_().printH();
- 
+
+                  //a3v.second->Hg_().printH();
+
                 }
             }
         }
- 
+
         std::cout << "\nH_global\n" << H_global << "\n";
         VLOG(1) << "\nH_global\n" << H_global << "\n";
         VLOG(1) << "\ng_global\n" << g_global << "\n";
- 
+
         Eigen::MatrixXd x = H_global.fullPivLu().solve(g_global);
- 
+
         double relative_error = (H_global*x - g_global).norm() / g_global.norm();
         VLOG(1) << "\nThe realtive error is:\n" << relative_error << "\n";
         VLOG(1) << "\nThe determinant is:\n" << H_global.determinant() << "\n";
         VLOG(1) << "\nX:\n" << x << "\n";
- 
- 
+
+
         Eigen::FullPivLU<Eigen::MatrixXd> lu_decomp(H_global);
         VLOG(1) << "\nThe rank of A is " << lu_decomp.rank() << "\n";
+
+        /* Update poses and save */
+        //mGlobalPoses[PoseName] = new cPose(aR,aT,PoseName)
+        //std::string save_eo_name = "global_poses_new.txt";
+        //std::ofstream eo_file(save_eo_name);
+
+        for (auto pose : poses_in_motions)
+        {
+            int id_start = 6*pose.second;
+            Vec3d dT(x(id_start,0),
+                     x(id_start+1,0),
+                     x(id_start+2,0));
+
+            Mat3d dW;
+            dW << 1,              -x(id_start+5,0), x(id_start+4,0),
+                  x(id_start+5,0), 1,              -x(id_start+3,0),
+                 -x(id_start+4,0), x(id_start+3,0), 1;
+
+
+            cPose * pose0 = mGlobalPoses[pose.first];
+            pose0->Show();
+
+            std::cout << "dT=" << dT << ",\ndW" << dW << "\n";
+
+
+            Mat3d newR = pose0->R()*dW;
+            double * newT = pose0->C();
+            newT[0] += dT[0];
+            newT[1] += dT[1];
+            newT[2] += dT[2];
+            std::cout << "pose0_C=\n" << pose0->C()[0] << " "
+                                   << pose0->C()[1] << " "
+                                   << pose0->C()[2] << "\n";
+            pose0->Show();
+         //             << ", \nnewT=" << newT[0] << " " << newT[1] << " " << newT[2] << "\n";
+
+            VLOG(1) << pose.first << " " << newR(0,0) << " " << newR(0,1) << " " << newR(0,2)
+                                  << " " << newR(1,0) << " " << newR(1,1) << " " << newR(1,2)
+                                  << " " << newR(2,0) << " " << newR(2,1) << " " << newR(2,2)
+                                  << " " << pose0->C()[0]+dT[0]
+                                  << " " << pose0->C()[1]+dT[1]
+                                  << " " << pose0->C()[2]+dT[2] << "\n";
+        }
+        //eo_file.close();
+
     }
     else
         LOG(INFO) << "0 poses to propagate.";
@@ -1208,13 +1284,15 @@ cAppCovInMotion::cAppCovInMotion(const std::string& avfile,
     ReadFeatures();
     ReadViews();
 
-    if (1)
+    if (0)
       PrintAllViews();
     if (0)
       PrintAllPts3d();
 
     /* Get covariances per motion */
     OptimizeRelMotions();
+
+    getchar();
 
     if (msimil_file!="")
       ReadSimGlobal();

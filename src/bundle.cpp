@@ -78,12 +78,12 @@ bool cResidualError::operator()(const T* const aW,
     T XPC = aPt3d[0]-aC[0];
     T YPC = aPt3d[1]-aC[1];
     T ZPC = aPt3d[2]-aC[2];
-    std::cout << "XYZ PC=" << XPC << " " << YPC << " " << ZPC << "<=>\n";
+    //std::cout << "XYZ PC=" << XPC << " " << YPC << " " << ZPC << "<=>\n";
     // Coordinate of points in  camera coordinate system, do not integrate "tiny" rotation
     T  XCam0 = mRot0(0,0)*XPC +  mRot0(1,0)*YPC +  mRot0(2,0)*ZPC;
     T  YCam0 = mRot0(0,1)*XPC +  mRot0(1,1)*YPC +  mRot0(2,1)*ZPC;
     T  ZCam0 = mRot0(0,2)*XPC +  mRot0(1,2)*YPC +  mRot0(2,2)*ZPC;
-    std::cout << "XYZCam0=" << XCam0 << " " << YCam0 << " " << ZCam0 << "<=>\n";
+    //std::cout << "XYZCam0=" << XCam0 << " " << YCam0 << " " << ZCam0 << "<=>\n";
 
     // Now "tiny" rotation
     //  Wx      X      Wy * Z - Wz * Y
@@ -94,26 +94,27 @@ bool cResidualError::operator()(const T* const aW,
     T  XCam = XCam0 + Wy * ZCam0 - Wz * YCam0;
     T  YCam = YCam0 + Wz * XCam0 - Wx * ZCam0;
     T  ZCam = ZCam0 + Wx * YCam0 - Wy * XCam0;
-    std::cout << "XYZCam=" << XCam << " " << YCam << " " << ZCam << "<=>\n";
+    //std::cout << "XYZCam=" << XCam << " " << YCam << " " << ZCam << "<=>\n";
 
 
     // project to bundle
     T xPi =  XCam/ZCam;
     T yPi =  YCam/ZCam;
-    std::cout << "xPi yPi=" << xPi << " " << yPi << "<=>\n";
+    //std::cout << "xPi yPi=" << xPi << " " << yPi << "<=>\n";
 
     // prediction - observation
     Residual[0] = (xPi - mPtBundle(0,0))/mPdsSqrt;
     Residual[1] = (yPi - mPtBundle(1,0))/mPdsSqrt;
 
 
-    std::cout << "eee\n W " << Wx << " " << Wy << " " << Wz << "\n"
+    /*std::cout << "eee\n W " << Wx << " " << Wy << " " << Wz << "\n"
               << "C "   << aC[0] << " " << aC[1] << " " << aC[2] << "\n"
               << "Pt3 " << aPt3d[0] << " " << aPt3d[1] << " " << aPt3d[2] << "\n"
               << "Rot\n" << mRot0 << "\n";
 
     std::cout << Residual[0] << " " << Residual[1] << ", bunP=" << xPi << "," << yPi
               << ", bunO=" << mPtBundle.transpose() <<  "-" << mPtBundle(0,0) << " " << mPtBundle(1,0) <<  "\n";
+    */
     return true;
 
 }
