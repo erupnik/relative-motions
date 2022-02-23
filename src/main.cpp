@@ -13,12 +13,16 @@ DEFINE_string(similarities_file,
 DEFINE_string(global_poses_file,
               "",
               "The file containing the inital global poses");
+DEFINE_string(output_poses_file,
+              "output_poses.txt",
+              "Compute covariance matrices per motions (this is only a check)");
 DEFINE_bool(covariance,
               false,
-              "Compute covariance matrices per motions");
+              "Compute covariance matrices per motions (this is only a check)");
 
 
 extern int cov_in_motions_main(std::string,
+                               std::string,
                                std::string,
                                std::string,
                                std::string,
@@ -37,6 +41,7 @@ int main(int argc, char** argv)
             << " --tracks_file=" << FLAGS_tracks_file
             << " --similarities_file=" << FLAGS_similarities_file
             << " --global_poses_file=" << FLAGS_global_poses_file
+            << " --output_poses_file=" << FLAGS_output_poses_file
             << " --covariance=" << FLAGS_covariance;
 
 
@@ -44,6 +49,7 @@ int main(int argc, char** argv)
                              FLAGS_tracks_file,
                              FLAGS_similarities_file,
                              FLAGS_global_poses_file,
+                             FLAGS_output_poses_file,
                              FLAGS_covariance);
 
 

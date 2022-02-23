@@ -4,9 +4,10 @@
 /* Project-wide contants */
 
 // Local bundle adjustment
-const double _FEAT_PDS=1.00;
-const double _ROT_PDS=1.0;//0.17*2;
-const double _T_PDS=2.0;//0.1;
+const double _FEAT_PDS=0.01; // 1pix/F because of normalized observations
+const double _ROT_PDS=0.1;//0.17*2;
+const double _T_PDS=0.1;//0.1;
+const double _HUBER_S=1; //also bc of normalization
 
 const double _ETA_up=0.1;
 const double _ETA=0.001;

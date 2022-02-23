@@ -34,6 +34,8 @@ class cPoseGen
     virtual double*   Cov_C() =0;
     virtual double*   Cov_Omega() =0;
 
+    virtual ~cPoseGen(){}
+
 
 };
 class cPoseBasic : public cPoseGen //basic pose on eigen matrices
@@ -230,7 +232,7 @@ class cNviewPoseX
     cPoseGen& View(int NbV)  {
          if (NbV==0) return *mView1; else if (NbV==1) return *mView21; else return *mView31; }
 
-    bool propagate_cov();
+    bool propagate_cov(Mat3d&,Mat3d&,Mat3d& );
     bool IS_COV_PROP() {return _COV_PROP;}
 
     cHessianGradientX& Hg_() {return *mHg;};
@@ -243,6 +245,8 @@ class cNviewPoseX
     void PrintAlpha() {std::cout << affine_trafo.alpha << "\n";}
     void PrintBeta() {std::cout << affine_trafo.beta << "\n";}
     void PrintLambda() {std::cout << affine_trafo.lambda << "\n";}
+
+    void Show() {mView1->Show(); mView21->Show(); if (mNbV==3) mView31->Show();}
 
   private:
     sAffine affine_trafo;
@@ -264,9 +268,9 @@ class cAppCovInMotion
                     const std::string&,
                     const std::string&,
                     const std::string&,
+                    const std::string&,
                     const bool );
 
-  private:
     bool ReadFeatures();
     bool ReadViews();
     bool ReadSimGlobal();
@@ -288,14 +292,17 @@ class cAppCovInMotion
     void WriteToPLYFile(const std::string& filename,
                         const std::string& viewName);
 
-
+    void WriteGlobalPFromRelPAndSim(const std::string& );
+  private:
     void MapJacToEigMat(Eigen::SparseMatrix<double>&, MatXd&, int offset);
     Eigen::SparseMatrix<double> MapJacToSparseM(CRSMatrix*);
+    Eigen::SparseMatrix<double> MatToSparseM(Eigen::MatrixXd&);
 
     std::string mviews_file;
     std::string mfeats_file;
     std::string msimil_file;
     std::string mglob_p_file;
+    std::string mout_p_file;
     bool        GET_COVARIANCES;
 
     /* relative motions and global poses */

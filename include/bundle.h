@@ -10,6 +10,7 @@
 
 /* Eigen */
 #include <Eigen/Sparse>
+#include <Eigen/SparseCholesky>
 
 /* Logging */
 #include "gflags/gflags.h"

@@ -39,6 +39,8 @@ ceres/rotation.h
 ../include/ceres/rotation.h
 Eigen/Sparse
 -
+Eigen/SparseCholesky
+-
 gflags/gflags.h
 ../include/gflags/gflags.h
 glog/logging.h

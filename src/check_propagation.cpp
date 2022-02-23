@@ -373,7 +373,10 @@ RELATIVE POSES (pose_i_j)
     //absolute poses
     //Pose_i1_m1 = 1/s_m1 * alpha_m1^-1 * (pose_i1_m1 - beta_m1)
     //Pose_i1_m2 = 1/s_m2 * alpha_m2^-1 * (pose_i1_m2 - beta_m2)
-    Mat3d R3_m1 = r3_m1.inverse() * alpha_m1;
+    Mat3d R3_m1 = r3_m1.inverse() * alpha_m1; // r = alpha * R***-1 , global to local
+                                              // r0 (w+I) = alpha (R0 (W+I))**-1 where (W+I)**-1 = (I-W)
+                                              //     w+1 = r0**-1 alpha (I-W)
+                                              //     w   = r0**-1 alpha (I-W) -I
     Vec3d T3_m1 = 1/s_m1 * alpha_m1_inv * (t3_m1 - beta_m1);
     cPoseBasic P3_m1(R3_m1,T3_m1,"0003.png");
     P3_m1.Show();

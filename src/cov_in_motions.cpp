@@ -79,6 +79,7 @@
          (alpha,beta) are NOT constants:
            res' =  J_p2d_p3q @ J_p3q_p3d^l @ J_p3d^l_rt @ J_rt_simil @ J_simil_RT
 
+    old der
     J = d_res/d_delta =
              d_Fn / d_delta = d_I/d_(Xq,Yq) @               //
                               d_Proj/d_(Xc,Yc,Zc) @         //
@@ -259,41 +260,48 @@ bool cNviewPoseT<T,U>::propagate_cov()
     return _COV_PROP;
 }
 
-bool cNviewPoseX::propagate_cov()
+bool cNviewPoseX::propagate_cov(Mat3d& Rg0,Mat3d& Rg1,Mat3d& Rg2)
 {
     if (_COV_PROP)
       return true;
 
-    Mat3d J_rt_T = affine_trafo.lambda * affine_trafo.alpha;
+    Mat3d id_skew_sym;
+    id_skew_sym << 1, -1, 1,
+                   1, 1, -1,
+                   -1, 1, 1;
 
-    //Mat3d skew_sym;
-    /*skew_sym << 0, -1, 1,
-                1, 0, -1,
-               -1, 1, 0;*/
-    /*skew_sym << 1, 0, 0,
-                0, 1, 0,
-                0, 0, 1;
-    Mat3d J_rt_R = affine_trafo.alpha * skew_sym;*/
-    Mat3d J_rt_R = J_rt_T;
+
+    Mat3d J_rt_T = affine_trafo.lambda * affine_trafo.alpha;
+    // r = alpha * R , global to local
+    // r0 (w+I) = alpha R0 (W+I) 
+    //     w+I = r0**-1 alpha * R0 * (I+W)
+    //     w   = r0**-1 alpha * R0 * (I+W) -I
+    //dw/dW = r0**-1 * alpha * R0* (Id+skew) 
+    Mat3d J_rt_R0 = (mView1->R()).inverse() * affine_trafo.alpha * Rg0 * id_skew_sym ;
+    Mat3d J_rt_R1 = (mView21->R()).inverse() * affine_trafo.alpha * Rg1 *id_skew_sym ;
+    Mat3d J_rt_R2;
+    if (NbView()==3) J_rt_R2 = (mView31->R()).inverse() * affine_trafo.alpha * Rg2 * id_skew_sym;
+
+    //std::cout << "J_rt_R0 " << J_rt_R0 << "\n";
+    //std::cout << "J_rt_R1 " << J_rt_R1 << "\n";
 
     int rc = _GAUGE_FIRST_CAM_FIX ? 6*(NbView()-1) : 6*NbView();
-
     MatXd J_rt_RT = MatXd::Zero(rc,rc);
     J_rt_RT.block(0,0,3,3) = J_rt_T;
-    J_rt_RT.block(3,3,3,3) = J_rt_R;
+    J_rt_RT.block(3,3,3,3) = _GAUGE_FIRST_CAM_FIX ? J_rt_R1 : J_rt_R0;
     if (J_rt_RT.cols()==12)
     {
       J_rt_RT.block(6,6,3,3) = J_rt_T;
-      J_rt_RT.block(9,9,3,3) = J_rt_R;
+      J_rt_RT.block(9,9,3,3) = _GAUGE_FIRST_CAM_FIX ? J_rt_R2 : J_rt_R1;
     }
     else if (J_rt_RT.cols()==18)
     {
 
       J_rt_RT.block(6,6,3,3) = J_rt_T;
-      J_rt_RT.block(9,9,3,3) = J_rt_R;
+      J_rt_RT.block(9,9,3,3) = J_rt_R1;
 
       J_rt_RT.block(12,12,3,3) = J_rt_T;
-      J_rt_RT.block(15,15,3,3) = J_rt_R;
+      J_rt_RT.block(15,15,3,3) = J_rt_R2;
 
     }
 
@@ -636,9 +644,9 @@ bool cAppCovInMotion::ReadGlobalPoses()
     while (!std::feof(fptr)  && !ferror(fptr))
     {
         Mat3d aR;
-        double aT[3];
+        double * aT = new double [3];
 
-        char aName[50];
+        char aName[20];
         OK = fscanf(fptr, "%s", aName);
         std::string PoseName = std::string(aName);
 
@@ -650,16 +658,19 @@ bool cAppCovInMotion::ReadGlobalPoses()
                 //std::cout << aR(aK1,aK2) << " " << aK1 << " ";
             }
         }
-        for (int aK1=0; aK1<3; aK1++)
+        if (OK>0)
         {
-            OK = fscanf(fptr, "%lf", &aT[aK1]);
-            //std::cout << aT[aK1] << " " << aK1 << " ";
+            for (int aK1=0; aK1<3; aK1++)
+            {
+                OK = fscanf(fptr, "%lf", &aT[aK1]);
+                std::cout << aT[aK1] << " " << aK1 << " ";
+            }
+
+            mGlobalPoses[PoseName] = new cPose(aR,aT,PoseName);
+            //mGlobalPoses[PoseName]->Show();
+            //getchar();
         }
-
-        mGlobalPoses[PoseName] = new cPose(aR,aT,PoseName);
-        //mGlobalPoses[PoseName]->Show();
-        //getchar();
-
+        
     }
 
     return true;
@@ -759,7 +770,7 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
               CostFunction * aCostF = cResidualError::Create( aR0,
                                                               aFeat2d->at(aK).at(aCam),
                                                               _FEAT_PDS);
-              LossFunction * aLossF = new HuberLoss(1.00);
+              LossFunction * aLossF = new HuberLoss(_HUBER_S);
               aProblem->AddResidualBlock(aCostF,aLossF,
                                          aW, aC, aFeat3d->at(aK));
           }
@@ -769,7 +780,7 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
                                                                aFeat2d->at(aK).at(aCam),
                                                                aFeat3d->at(aK),
                                                                _FEAT_PDS);
-              LossFunction * aLossF = new HuberLoss(1.0);
+              LossFunction * aLossF = new HuberLoss(_HUBER_S);
               aProblem->AddResidualBlock(aCostF,aLossF,
                                          aW, aC);
           }
@@ -956,16 +967,16 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
           }
           std::cout << "\n";
         }
-        std::cout << "covariance\n";
+        VLOG(2) << "covariance\n";
         for (int aK1=0; aK1<aJ->num_cols; aK1++)
         {
           for (int aK2=0; aK2<aJ->num_cols; aK2++)
           {
-              std::cout << JtWJ_inv.coeffRef(aK1,aK2) << " ";
+              VLOG(2) << JtWJ_inv.coeffRef(aK1,aK2) << " ";
           }
-          std::cout << "\n";
+          VLOG(2) << "\n";
         }
-        getchar();
+        //getchar();
       }
     }
 
@@ -986,6 +997,24 @@ void cAppCovInMotion::MapJacToEigMat(Eigen::SparseMatrix<double>& J, MatXd& JMat
         JMat(i+offset, k+offset) = J.coeffRef(i,k);
       }
     }
+}
+Eigen::SparseMatrix<double> cAppCovInMotion::MatToSparseM(Eigen::MatrixXd& M)
+{
+    int r = M.rows();
+    int c =  M.cols();
+    Eigen::SparseMatrix<double> A(r, c);
+
+    for (int i = 0; i < r; i++)
+    {
+      for (int k = 0; k < c; k++)
+      {
+        A.coeffRef(i, k) = M(i,k);
+        //std::cout << A.coeffRef(i, k) << " " ;
+      }
+    }
+
+    return A;
+
 }
 
 Eigen::SparseMatrix<double> cAppCovInMotion::MapJacToSparseM(CRSMatrix* J)
@@ -1050,7 +1079,7 @@ bool cAppCovInMotion::OptimizeRelMotions()
 
     for (auto a3v : mAllViewMap_)
     {
-        std::cout << "=============== " << Cnt << " " << a3v.first << "===========================\n";
+        if (VLOG_IS_ON(2)) VLOG(2) << "=============== " << Cnt << " " << a3v.first << "===========================\n";
         if (!BuildProblem_(a3v.second,a3v.first))
 		    {
                 std::cout << " not added in the block because no observations" << "\n";
@@ -1082,13 +1111,24 @@ bool cAppCovInMotion::OptimizeGlobally()
     //1- Propagate covariances
 
     int pose_idx=0;
+    Mat3d Rg3Dummy = Mat3d::Identity();
+
     //N-view
     for (auto a3v : mAllViewMap_)
     {
         std::cout << "=============== "  << a3v.first << "===========================\n";
 
-        if (a3v.second->propagate_cov())
+        if (a3v.second->propagate_cov(mGlobalPoses[poses_in_motions,a3v.second->View(0).Name()]->R(),
+                                      mGlobalPoses[poses_in_motions,a3v.second->View(1).Name()]->R(),
+                                      (a3v.second->NbView()==3) ? 
+                                      mGlobalPoses[poses_in_motions,a3v.second->View(2).Name()]->R() : Rg3Dummy)); 
         {
+
+          /*std::cout << a3v.second->View(0).Name() << " "
+                    << a3v.second->View(1).Name() << " "
+                    << ((a3v.second->NbView()==3) ?
+                          poses_in_motions,a3v.second->View(2).Name() : " ") << "\n";
+          a3v.second->Show();*/
 
           if (!DicBoolFind(poses_in_motions,a3v.second->View(0).Name()))
             poses_in_motions[a3v.second->View(0).Name()] = pose_idx++;
@@ -1148,12 +1188,17 @@ bool cAppCovInMotion::OptimizeGlobally()
             }
         }
 
-        std::cout << "\nH_global\n" << H_global << "\n";
         VLOG(1) << "\nH_global\n" << H_global << "\n";
         VLOG(1) << "\ng_global\n" << g_global << "\n";
 
         Eigen::MatrixXd x = H_global.fullPivLu().solve(g_global);
+    
+/*        Eigen::SparseMatrix<double> H_global_SpM = MatToSparseM(H_global);
 
+        Eigen::SimplicialLDLT<Eigen::SparseMatrix<double> > solver;
+        solver.compute(H_global_SpM);
+        VecXd x = solver.solve(g_global);
+*/
         double relative_error = (H_global*x - g_global).norm() / g_global.norm();
         VLOG(1) << "\nThe realtive error is:\n" << relative_error << "\n";
         VLOG(1) << "\nThe determinant is:\n" << H_global.determinant() << "\n";
@@ -1164,9 +1209,8 @@ bool cAppCovInMotion::OptimizeGlobally()
         VLOG(1) << "\nThe rank of A is " << lu_decomp.rank() << "\n";
 
         /* Update poses and save */
-        //mGlobalPoses[PoseName] = new cPose(aR,aT,PoseName)
-        //std::string save_eo_name = "global_poses_new.txt";
-        //std::ofstream eo_file(save_eo_name);
+        std::fstream eo_file;
+        eo_file.open(mout_p_file.c_str(), std::istream::out);
 
         for (auto pose : poses_in_motions)
         {
@@ -1182,36 +1226,70 @@ bool cAppCovInMotion::OptimizeGlobally()
 
 
             cPose * pose0 = mGlobalPoses[pose.first];
-            pose0->Show();
-
-            std::cout << "dT=" << dT << ",\ndW" << dW << "\n";
-
 
             Mat3d newR = pose0->R()*dW;
-            double * newT = pose0->C();
-            newT[0] += dT[0];
-            newT[1] += dT[1];
-            newT[2] += dT[2];
-            std::cout << "pose0_C=\n" << pose0->C()[0] << " "
-                                   << pose0->C()[1] << " "
-                                   << pose0->C()[2] << "\n";
             pose0->Show();
-         //             << ", \nnewT=" << newT[0] << " " << newT[1] << " " << newT[2] << "\n";
-
-            VLOG(1) << pose.first << " " << newR(0,0) << " " << newR(0,1) << " " << newR(0,2)
+            std::cout << "dT=" << dT << "\n";
+            eo_file << pose.first << " " << newR(0,0) << " " << newR(0,1) << " " << newR(0,2)
                                   << " " << newR(1,0) << " " << newR(1,1) << " " << newR(1,2)
                                   << " " << newR(2,0) << " " << newR(2,1) << " " << newR(2,2)
                                   << " " << pose0->C()[0]+dT[0]
                                   << " " << pose0->C()[1]+dT[1]
                                   << " " << pose0->C()[2]+dT[2] << "\n";
         }
-        //eo_file.close();
+        eo_file.close();
 
     }
     else
         LOG(INFO) << "0 poses to propagate.";
 
     return true;
+}
+
+void cAppCovInMotion::WriteGlobalPFromRelPAndSim(const std::string& filename)
+{
+    std::fstream eo_file;
+    eo_file.open(filename.c_str(), std::istream::out);
+
+    int cmpt=0;
+    for (auto a3v : mAllViewMap_)
+    {
+        int NumView = a3v.second->NbView();
+        for (int pose=0; pose<NumView; pose++)
+        {
+            std::string im_name =  std::to_string(cmpt) + a3v.second->View(pose).Name();
+
+            Mat3d r = a3v.second->View(pose).R();
+            double * cptr = a3v.second->View(pose).C();
+            Vec3d c;
+            c << cptr[0], cptr[1], cptr[2];
+
+            Mat3d alpha = a3v.second->alpha();
+            Vec3d beta = a3v.second->beta();
+            double lambda = a3v.second->lambda();
+
+            Mat3d R = alpha.inverse() * r;
+            Vec3d T = 1.0/lambda * alpha.inverse() * (c - beta);
+        
+            eo_file << im_name << " " << R(0,0) << " " << R(0,1) << " " << R(0,2)
+                               << " " << R(1,0) << " " << R(1,1) << " " << R(1,2)
+                               << " " << R(2,0) << " " << R(2,1) << " " << R(2,2)
+                               << " " << T[0]
+                               << " " << T[1]
+                               << " " << T[2] << "\n";
+            
+            //std::cout << im_name << "\n";
+            //std::cout << "alpha=" << alpha << "\n beta=" << beta << "\n s=" << lambda << "\n";
+            //std::cout << "r=" << r << "\nt" << c << "\n";
+            //std::cout << "R=" << R << "\nT=" << T << "\n";
+            std::cout << "cp DummyIm.tif " << im_name << "\n";
+
+        }
+        cmpt++;
+        //getchar();
+
+    }
+    eo_file.close();
 }
 
 void cAppCovInMotion::WriteToPLYFile(const std::string& filename, const std::string& viewName)
@@ -1274,11 +1352,13 @@ cAppCovInMotion::cAppCovInMotion(const std::string& avfile,
                                  const std::string& affile,
                                  const std::string& asimfile,
                                  const std::string& aglobpfile,
+                                 const std::string& aoutpfile,
                                  const bool get_covariances) :
   mviews_file(avfile),
   mfeats_file(affile),
   msimil_file(asimfile),
   mglob_p_file(aglobpfile),
+  mout_p_file(aoutpfile),
   GET_COVARIANCES(get_covariances)
 {
     ReadFeatures();
@@ -1289,13 +1369,18 @@ cAppCovInMotion::cAppCovInMotion(const std::string& avfile,
     if (0)
       PrintAllPts3d();
 
+
+
     /* Get covariances per motion */
     OptimizeRelMotions();
 
-    getchar();
+    //getchar();
 
     if (msimil_file!="")
       ReadSimGlobal();
+    
+    //WriteGlobalPFromRelPAndSim("globalp_from_relp_check.txt");
+    //getchar();
 
     if (mglob_p_file!="")
       ReadGlobalPoses();
@@ -1309,14 +1394,15 @@ int cov_in_motions_main(std::string views,
                         std::string tracks,
                         std::string similarities,
                         std::string global_poses,
+                        std::string out_poses,
                         bool get_covariances)
 {
 
 
 
-  cAppCovInMotion anAp(views,tracks,similarities,global_poses,get_covariances);
+  cAppCovInMotion anAp(views,tracks,similarities,global_poses,out_poses,get_covariances);
   //cAppCovInMotion anAp(aArg1,aArg2,aArg3,aArg4);
 
 
-  return 1;
+  return EXIT_SUCCESS;
 }

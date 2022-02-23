@@ -36,10 +36,14 @@ file(GLOB_RECURSE TestER_SRC
 
 add_executable(${PROJECT_NAME} "src/main.cpp" "src/cov_in_motions.cpp" "src/bundle.cpp" )
 add_executable("bench" "src/check_propagation.cpp" "src/cov_in_motions.cpp" "src/bundle.cpp" )
+add_executable("triplet_utils" "src/triplet_utils.cpp" "src/cov_in_motions.cpp" "src/bundle.cpp")
 
 
 target_link_libraries(${PROJECT_NAME} ${CERES_LIBRARIES} ) #
 target_link_libraries("bench" ${CERES_LIBRARIES} ) #
+target_link_libraries("triplet_utils" ${CERES_LIBRARIES} ) #
+
 
 install (TARGETS ${PROJECT_NAME} DESTINATION ${INSTALL_DIR})
 install (TARGETS "bench" DESTINATION ${INSTALL_DIR})
+install (TARGETS "triplet_utils" DESTINATION ${INSTALL_DIR})
