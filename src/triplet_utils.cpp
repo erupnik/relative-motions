@@ -122,8 +122,140 @@ bool cTripletSet::ReadViews()
     return EXIT_SUCCESS;
 }
 
-//        bool ReadSimGlobal();
-//        bool ReadGlobalPoses();
+bool cTripletSet::ReadSimGlobal()
+{
+FILE* fptr = fopen(msimil_file.c_str(), "r");
+    if (fptr == NULL) {
+      return false;
+    };
+
+    int OK=1;
+
+    while (!std::feof(fptr)  && !ferror(fptr))
+    {
+
+        int aNbV;
+        fscanf(fptr, "%i", &aNbV);
+        //std::cout << aNbV << "\n";
+        //getchar();
+
+        std::string              aViewName ="";
+        std::vector<std::string> aPoseNameV;
+        for (int aK=0; aK<aNbV; aK++)
+        {
+            char aName[50];
+            fscanf(fptr, "%s", aName);
+            aPoseNameV.push_back(aName);
+
+            if (aK!=0)
+              aViewName+="-";
+
+            aViewName += aName;
+            //std::cout <<  " " << aName << " aK=" << aK;
+        }
+        //std::cout <<  aViewName << "\n";
+
+        if (DicBoolFind(mAllViewMap_,aViewName))
+        {
+            double& L = mAllViewMap_[aViewName]->lambda();
+            Mat3d&  alpha = mAllViewMap_[aViewName]->alpha();
+            Vec3d&  beta  = mAllViewMap_[aViewName]->beta();
+
+            if (! ReadRotTrS(fptr,alpha,beta,L))
+            {
+                std::cout << "ERROR reading global similitude in cAppCovInMotion::ReadSimGlobal for "
+                          << aViewName << "\n" ;
+                return false;
+            }
+
+            //m2ViewMap_[aViewName]->PrintAlpha();
+            //m2ViewMap_[aViewName]->PrintBeta();
+            //getchar();
+
+        }
+        else
+        {
+            double i;
+            for (int aK=0; aK<13; aK++)
+            {
+                fscanf(fptr, "%lf", &i);
+            }
+        }
+
+    }
+    
+    return EXIT_SUCCESS;
+}
+
+bool cTripletSet::ReadRotTrS(FILE* fptr,Mat3d& alpha,Vec3d& beta,double& s)
+{
+    bool OK;
+    //rotation
+    for (int aK1=0; aK1<3; aK1++)
+    {
+        for (int aK2=0; aK2<3; aK2++)
+        {
+            OK = fscanf(fptr, "%lf", &alpha(aK1,aK2));
+            //std::cout << alpha(aK1,aK2) << " " << aK1 << " ";
+        }
+    }
+
+    //translation
+    for (int aK=0; aK<3; aK++)
+    {
+        OK = fscanf(fptr, "%lf", &beta(aK));
+        //std::cout << beta(aK) << " ";
+    }
+
+    //scale
+    OK = fscanf(fptr, "%lf", &s);
+    //std::cout << s << " " << OK << " s";
+
+    return OK;
+}
+
+bool cTripletSet::ReadGlobalPoses()
+{
+    FILE* fptr = fopen(mglob_p_file.c_str(), "r");
+    if (fptr == NULL) {
+      return false;
+    };
+
+    int OK=1;
+    while (!std::feof(fptr)  && !ferror(fptr))
+    {
+        Mat3d aR;
+        double * aT = new double [3];
+
+        char aName[20];
+        OK = fscanf(fptr, "%s", aName);
+        std::string PoseName = std::string(aName);
+
+        for (int aK1=0; aK1<3; aK1++)
+        {
+            for (int aK2=0; aK2<3; aK2++)
+            {
+                OK = fscanf(fptr, "%lf", &aR(aK1,aK2));
+                //std::cout << aR(aK1,aK2) << " " << aK1 << " ";
+            }
+        }
+        if (OK>0)
+        {
+            for (int aK1=0; aK1<3; aK1++)
+            {
+                OK = fscanf(fptr, "%lf", &aT[aK1]);
+                std::cout << aT[aK1] << " " << aK1 << " ";
+            }
+
+            mGlobalPoses[PoseName] = new cPose(aR,aT,PoseName);
+            //mGlobalPoses[PoseName]->Show();
+            //getchar();
+        }
+        
+    }
+    
+    return EXIT_SUCCESS;
+}
 
 
 
