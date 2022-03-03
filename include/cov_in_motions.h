@@ -1,12 +1,16 @@
 #ifndef _COV_IN_MOT_H
 #define _COV_IN_MOT_H
 
+#include "all.h"
+#include "triplet_utils.h"
 #include "bundle.h"
-
+#include <Eigen/IterativeLinearSolvers>
+#include <Eigen/Dense>
 
 class cPose;
 class cNviewPose;
 class cAppCovInMotion;
+class cTripletSet;
 
 template <class TVal,class TCont>
 bool DicBoolFind(const TCont & aCont,const TVal & aVal)
@@ -77,7 +81,7 @@ class cPose : public cPoseGen //any pose, relative or absolute
              mOmega[1] = 0;//_ETA*double(std::rand()) / RAND_MAX;
              mOmega[2] = 0;//_ETA*double(std::rand()) / RAND_MAX;
            }
-        ~cPose(){}
+        ~cPose(){ delete mOmega; delete mCov_C; delete mCov_C; delete mCov_Omega; }
 
         Vec3d&    C_();//not implemented
         double*   C() {return mC;}
@@ -227,7 +231,9 @@ class cNviewPoseX
                             mView31(v3),
                             mHg(aHg),
                             mNbV( (&(*mView31)==NULL) ? 2 : 3 ),
-                            _COV_PROP(false) {}
+                            _COV_PROP(false),
+                            _FLAG_OUTLIER(false),
+                            _INIT(false) {}
 
     cPoseGen& View(int NbV)  {
          if (NbV==0) return *mView1; else if (NbV==1) return *mView21; else return *mView31; }
@@ -246,6 +252,9 @@ class cNviewPoseX
     void PrintBeta() {std::cout << affine_trafo.beta << "\n";}
     void PrintLambda() {std::cout << affine_trafo.lambda << "\n";}
 
+    bool Init() {return _INIT;}
+    void SetInit() {_INIT=true;}
+    void SetOutlier() {_FLAG_OUTLIER=true;}
     void Show() {mView1->Show(); mView21->Show(); if (mNbV==3) mView31->Show();}
 
   private:
@@ -259,6 +268,9 @@ class cNviewPoseX
     int                                  mNbV;
     bool                                 _COV_PROP;
 
+    bool                                 _FLAG_OUTLIER;
+    bool                                 _INIT;
+
 };
 
 class cAppCovInMotion
@@ -270,14 +282,9 @@ class cAppCovInMotion
                     const std::string&,
                     const std::string&,
                     const bool );
+    ~cAppCovInMotion();
 
     bool ReadFeatures();
-    bool ReadViews();
-    bool ReadSimGlobal();
-    bool ReadGlobalPoses();
-    bool ReadRotTrS(FILE* fptr,Mat3d& alpha,Vec3d& beta,double& s);
-
-    void PrintAllViews();
     void PrintAllPts3d();
 
 
@@ -292,7 +299,6 @@ class cAppCovInMotion
     void WriteToPLYFile(const std::string& filename,
                         const std::string& viewName);
 
-    void WriteGlobalPFromRelPAndSim(const std::string& );
   private:
     void MapJacToEigMat(Eigen::SparseMatrix<double>&, MatXd&, int offset);
     Eigen::SparseMatrix<double> MapJacToSparseM(CRSMatrix*);
@@ -306,11 +312,7 @@ class cAppCovInMotion
     bool        GET_COVARIANCES;
 
     /* relative motions and global poses */
-    std::map<std::string,cNviewPoseX*>   mAllViewMap_;//ok
-
-    //std::map<std::string,c2viewPose*> m2ViewMap;//ok
-    //std::map<std::string,c3viewPose*> m3ViewMap;//ok
-    std::map<std::string,cPose*>      mGlobalPoses;//ok
+    cTripletSet                        * mTriSet;
 
     /* view id is the string; the vector stores features */
     std::map<std::string,std::vector<std::vector<Vec2d>>* > mFeatViewMap;//ok

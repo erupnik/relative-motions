@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <list>
 #include <ctime>
 
 #include "Eigen/Core"
