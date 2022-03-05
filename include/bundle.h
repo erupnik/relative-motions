@@ -49,6 +49,41 @@ class cPoseConstraint
       const double   pose_pds;
 };
 
+class cResidualOnViewPose
+{
+    public: 
+        cResidualOnViewPose(const Mat3d alpha, const Vec3d beta, const double lambda,
+                            const Mat3d r0, const Vec3d c0, const Mat3d R0, const Mat6d covariance) :
+                                               m_alpha(alpha),
+                                               m_beta(beta),
+                                               m_lambda(lambda),
+                                               m_r0(r0),
+                                               m_r0_inv_alpha_R0(r0.inverse() * alpha * R0),
+                                               m_c0(c0),
+                                               m_R0(R0),
+                                               m_cov(covariance) {}
+        ~cResidualOnViewPose(){}
+
+        template <typename T>
+            bool operator()(const T* const C, const T* const W, T* Residual) const;
+
+        static CostFunction* Create(const Mat3d alpha, const Vec3d beta, const double lambda,
+                                    const Mat3d r0, const Vec3d c0, const Mat3d R0, const Mat6d covariance);
+
+    private:
+        const Mat3d m_alpha;
+        const Vec3d m_beta;
+        const double m_lambda;
+
+        const Mat3d m_r0;
+        const Mat3d m_r0_inv_alpha_R0;
+        const Vec3d m_c0;
+
+        const Mat3d m_R0;
+
+        const Mat6d m_cov;
+};
+
 class cResidualOnPose
 {
     public :

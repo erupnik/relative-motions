@@ -19,6 +19,9 @@ DEFINE_string(output_poses_file,
 DEFINE_bool(covariance,
               false,
               "Compute covariance matrices per motions (this is only a check)");
+DEFINE_string(covariance_key,
+              "_log",
+              "Compute covariance matrices per motions (this is only a check)");
 
 
 extern int cov_in_motions_main(std::string,
@@ -26,7 +29,8 @@ extern int cov_in_motions_main(std::string,
                                std::string,
                                std::string,
                                std::string,
-                               bool);
+                               bool,
+			       std::string);
 
 
 int main(int argc, char** argv)
@@ -42,7 +46,8 @@ int main(int argc, char** argv)
             << " --similarities_file=" << FLAGS_similarities_file
             << " --global_poses_file=" << FLAGS_global_poses_file
             << " --output_poses_file=" << FLAGS_output_poses_file
-            << " --covariance=" << FLAGS_covariance;
+            << " --covariance=" << FLAGS_covariance
+            << " --covariance_key=" << FLAGS_covariance_key;
 
 
   return cov_in_motions_main(FLAGS_views_file,
@@ -50,7 +55,8 @@ int main(int argc, char** argv)
                              FLAGS_similarities_file,
                              FLAGS_global_poses_file,
                              FLAGS_output_poses_file,
-                             FLAGS_covariance);
+                             FLAGS_covariance,
+                             FLAGS_covariance_key);
 
 
 }

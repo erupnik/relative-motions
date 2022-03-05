@@ -4,7 +4,48 @@
 /* Cost functions */
 class cResidualError;//pose and 3d points as parameters
 class cResidualOnPose;//only pose as parameter
+class cResidualOnViewPose; //local to global view transformation with covariance propagation
 class cPoseConstraint;//constrant on pose
+
+template <typename T>
+bool cResidualOnViewPose::operator()(const T* const C, const T* const W, T* Residual) const
+{
+    
+     /*    1, -Wz, Wy,
+           Wz, 1, -Wx,
+          -Wy, Wx, 1; */
+    //Iw =  inv(r0) @ M @ R0 @ (I + WMat) => output is also skew
+
+    //lambda * alpha * C  + beta - c = e
+    T res_cx = m_lambda * (m_alpha(0,0)*C[0] +  m_alpha(1,0)*C[1] +  m_alpha(2,0)*C[2]) + m_beta[0] - m_c0[0];
+    T res_cy = m_lambda * (m_alpha(0,1)*C[0] +  m_alpha(1,1)*C[1] +  m_alpha(2,1)*C[2]) + m_beta[1] - m_c0[1];
+    T res_cz = m_lambda * (m_alpha(0,2)*C[0] +  m_alpha(1,2)*C[1] +  m_alpha(2,2)*C[2]) + m_beta[2] - m_c0[2];
+    
+    // r = alpha * R , global to local
+    // r0 (w+I) = alpha R0 (W+I) 
+    //     w+I = r0**-1 alpha * R0 * (I+W)
+    //
+    //w   = r0**-1 alpha * R0 * (I+W) -I => r0**-1 alpha * R0 * (I+W) -I -w = e  (here w=0) 
+    T res_wx = m_r0_inv_alpha_R0(2,0)*(-W[2]) + m_r0_inv_alpha_R0(2,1)*1 + m_r0_inv_alpha_R0(2,2)*W[0]; //wx (2,1)
+    T res_wy = m_r0_inv_alpha_R0(0,0)*W[1] + m_r0_inv_alpha_R0(0,1)*(-W[0]) + m_r0_inv_alpha_R0(0,2)*1; //wy (0,2)
+    T res_wz = m_r0_inv_alpha_R0(1,0)*1 + m_r0_inv_alpha_R0(1,1)*(W[2]) + m_r0_inv_alpha_R0(1,2)*(-W[1]); //wz (1,0)
+
+    //apply covariances 
+    Residual[0] = m_cov(0,0)*res_cx + m_cov(0,1)*res_cy + m_cov(0,2)*res_cz + m_cov(0,3)*res_wx + m_cov(0,4)*res_wy + m_cov(0,5)*res_wz; 
+    Residual[1] = m_cov(1,0)*res_cx + m_cov(1,1)*res_cy + m_cov(1,2)*res_cz + m_cov(1,3)*res_wx + m_cov(1,4)*res_wy + m_cov(1,5)*res_wz;
+    Residual[2] = m_cov(2,0)*res_cx + m_cov(2,1)*res_cy + m_cov(2,2)*res_cz + m_cov(2,3)*res_wx + m_cov(2,4)*res_wy + m_cov(2,5)*res_wz;
+    Residual[3] = m_cov(3,0)*res_cx + m_cov(3,1)*res_cy + m_cov(3,2)*res_cz + m_cov(3,3)*res_wx + m_cov(3,4)*res_wy + m_cov(3,5)*res_wz;
+    Residual[4] = m_cov(4,0)*res_cx + m_cov(4,1)*res_cy + m_cov(4,2)*res_cz + m_cov(4,3)*res_wx + m_cov(4,4)*res_wy + m_cov(4,5)*res_wz;
+    Residual[5] = m_cov(5,0)*res_cx + m_cov(5,1)*res_cy + m_cov(5,2)*res_cz + m_cov(5,3)*res_wx + m_cov(5,4)*res_wy + m_cov(5,5)*res_wz;
+
+    return true;
+}
+
+CostFunction * cResidualOnViewPose::Create(const Mat3d alpha, const Vec3d beta, const double lambda,
+                                           const Mat3d r0, const Vec3d c0,const Mat3d R0, const Mat6d covariance)
+{
+    return  (new AutoDiffCostFunction<cResidualOnViewPose,6,3,3> (new cResidualOnViewPose(alpha,beta,lambda,r0,c0,R0,covariance)));
+}
 
 template <typename T>
 bool cResidualOnPose::operator()(const T* const aW,

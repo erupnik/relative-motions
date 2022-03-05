@@ -281,7 +281,8 @@ class cAppCovInMotion
                     const std::string&,
                     const std::string&,
                     const std::string&,
-                    const bool );
+                    const bool,
+                    const std::string& );
     ~cAppCovInMotion();
 
     bool ReadFeatures();
@@ -309,7 +310,9 @@ class cAppCovInMotion
     std::string msimil_file;
     std::string mglob_p_file;
     std::string mout_p_file;
+
     bool        GET_COVARIANCES;
+    std::string mcov_key;
 
     /* relative motions and global poses */
     cTripletSet                        * mTriSet;

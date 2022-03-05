@@ -23,10 +23,14 @@ class cTripletSet
         bool ReadSimGlobal();
         bool ReadGlobalPoses();
         void PrintAllViews();
+        void PrintAllPoses();
 
         void LocalToGlobal(cNviewPoseX*,const int& view,Mat3d&,Vec3d&);
+
         void WriteGlobalPFromRelPAndSim(const std::string& );
+        void SaveGlobalPoses(const std::string&);
         
+        cPose*& Pose(std::string name) {return mGlobalPoses[name];}        
 
     private:
         friend class cAppCovInMotion;
@@ -51,6 +55,7 @@ class cFilterTrip
         cFilterTrip(std::string views,
                     std::string simil,
                     bool do_only_pred,
+                    std::string outgpose="",
                     std::string gpose="",
                     std::string filterd_views="");
 

@@ -307,6 +307,17 @@ void cTripletSet::PrintAllViews()
 
       }
 }
+
+void cTripletSet::PrintAllPoses()
+{
+    std::cout << "Global poses:\n";
+    for (auto pose : mGlobalPoses)
+    {
+        std::cout << pose.first << "\n";
+        pose.second->Show();
+    }
+}
+
 void cTripletSet::LocalToGlobal(cNviewPoseX* pose,const int& view, Mat3d& R,Vec3d& C)
 {
     //pose->Show();
@@ -322,6 +333,36 @@ void cTripletSet::LocalToGlobal(cNviewPoseX* pose,const int& view, Mat3d& R,Vec3
 
     R = alpha.inverse() * r;
     C = 1.0/lambda * alpha.inverse() * (c - beta);
+
+}
+
+void cTripletSet::SaveGlobalPoses(const std::string& filename)
+{
+    std::fstream eo_file;
+    eo_file.open(filename.c_str(), std::istream::out);
+
+    for (auto pose : mGlobalPoses)
+    {
+
+        cPose * pose0 = mGlobalPoses[pose.first];
+        
+        Mat3d dW;
+        dW << 1,                 -pose0->Omega()[2], pose0->Omega()[1],
+              pose0->Omega()[2],    1,              -pose0->Omega()[0],
+             -pose0->Omega()[1], pose0->Omega()[0],             1;
+
+
+        Mat3d newR = pose0->R()*dW;
+        //pose0->Show();
+
+        eo_file << pose.first << " " << newR(0,0) << " " << newR(0,1) << " " << newR(0,2)
+                              << " " << newR(1,0) << " " << newR(1,1) << " " << newR(1,2)
+                              << " " << newR(2,0) << " " << newR(2,1) << " " << newR(2,2)
+                              << " " << pose0->C()[0]
+                              << " " << pose0->C()[1]
+                              << " " << pose0->C()[2] << "\n";
+    }
+    eo_file.close();
 
 }
 
@@ -644,6 +685,7 @@ void cFilterTrip::SaveViews(cTripletSet& Tri,
 cFilterTrip::cFilterTrip(std::string views,
                          std::string simil,
                          bool do_only_pred,
+                         std::string outgpose,
                          std::string gpose,
                          std::string filtered_views)
 {
@@ -658,7 +700,7 @@ cFilterTrip::cFilterTrip(std::string views,
 
     if (ONLY_PREDICTION)
     {
-        aTriSet.WriteGlobalPFromRelPAndSim(gpose);
+        aTriSet.WriteGlobalPFromRelPAndSim(outgpose);
         getchar();
     }
     else //do filter

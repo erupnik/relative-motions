@@ -616,8 +616,9 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
     }
 
     //get the jacobians
-    double cost;// = aSummary.final_cost;//
+    double cost=0;// = aSummary.final_cost;//
     Problem::EvaluateOptions aEvalOpts;
+    aEvalOpts.apply_loss_function = true;
 
     aEvalOpts.parameter_blocks = param_bloc_CR;
     std::vector<double> res;
@@ -647,7 +648,7 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
     }
 
     Eigen::VectorXd my_vect = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(JtWres.data(), JtWres.size());//fixed-size to dynamic
-    views->Hg_() = *(new cHessianGradientX(JtWJ_,my_vect));
+    views->Hg_() = *(new cHessianGradientX((JtWJ_).sqrt(),my_vect));
 
     bool checkRank = false;
     if (checkRank)
@@ -693,10 +694,10 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
       Eigen::SparseMatrix<double> JtWJ_inv = solver.solve(I);
 
       //save covariance diagonal
-      std::string covR_file_name = "covarianceR_log.txt";
+      std::string covR_file_name = "covR" + mcov_key + ".txt";
       std::fstream covR_file;
       covR_file.open(covR_file_name.c_str(), std::ios_base::app);
-      std::string covC_file_name = "covarianceC_log.txt";
+      std::string covC_file_name = "covC" + mcov_key + ".txt";
       std::fstream covC_file;
       covC_file.open(covC_file_name.c_str(), std::ios_base::app);
 
@@ -720,22 +721,58 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
                 int id_block = std::floor(double(aK1)/3);
 
                 if (id_block % 2 == 0) // if even -> C
-                    covC_file << JtWJ_inv.coeffRef(aK1,aK2) << " ";
+                    covC_file << JtWJ.coeffRef(aK1,aK2) << " ";
                 else // if odd -> R
-                    covR_file << JtWJ_inv.coeffRef(aK1,aK2) << " ";
+                    covR_file << JtWJ.coeffRef(aK1,aK2) << " ";
 
-                 VLOG(2) << JtWJ_inv.coeffRef(aK1,aK2) << " ";
+                 VLOG(2) << JtWJ.coeffRef(aK1,aK2) << " ";
             }
 
         }
         
       }
       VLOG(2) << "\n";
-
       covR_file << "\n";
       covR_file.close();
       covC_file << "\n";
       covC_file.close();
+
+      //save the gradient vector  my_vect
+      std::string gradR_file_name = "gradR" + mcov_key + ".txt";
+      std::fstream gradR_file;
+      gradR_file.open(gradR_file_name.c_str(), std::ios_base::app);
+      std::string gradC_file_name = "gradC" + mcov_key + ".txt";
+      std::fstream gradC_file;
+      gradC_file.open(gradC_file_name.c_str(), std::ios_base::app);
+
+
+      gradR_file << views->NbView() << " "; 
+      gradC_file << views->NbView() << " "; 
+      for (auto vn : vname_decom)
+      {
+          gradR_file << vn << " " ; 
+          gradC_file << vn << " " ; 
+      }
+
+      VLOG(2) << "gradients \n";
+      for (int aK=0; aK<my_vect.size(); aK++)
+      {
+          int id_block = std::floor(double(aK)/3);
+
+          if (id_block % 2 == 0) // if even -> C
+              gradC_file << my_vect[aK] << " ";
+          else // if odd -> R
+              gradR_file << my_vect[aK] << " ";
+                 
+          VLOG(2) << my_vect[aK] << " ";
+
+      }
+      VLOG(2) << "\n";
+
+      gradR_file << "\n";
+      gradR_file.close();
+      gradC_file << "\n";
+      gradC_file.close();
 
 
       //print hessian 
@@ -815,6 +852,31 @@ Eigen::SparseMatrix<double> cAppCovInMotion::MapJacToSparseM(CRSMatrix* J)
     return A;
 }
 
+//final, global least-squares simultaneously on all poses  
+void cAppCovInMotion::SetMinimizerGlobal(ceres::Solver::Options& aSolOpt)
+{
+  //S - the reduced camera matrix / the Shur complement;
+  //uses the SHURR trick; solves S as a dense matrix with Cholesky factorization; i
+  //for problems up to several hundreds of cameras
+  aSolOpt.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;//ceres::DENSE_SCHUR;
+  //uses the SHURR trick; solves S as a sparse matrix with Cholesky factorization;
+  //aSolOpt.linear_solver_type = ceres::SPARSE_SCHUR;
+  //applies Preconditioned Conjugate Gradients to S; implements inexact step algorithm;
+  //choose a precondition, e.g. CLUSTER_JACOBI,CLUSTER_TRIDIAGONAL that exploits camera-point visibility structure
+  //mSolopt.linear_solver_type = ceres::ITERATIVE_SHUR;
+
+  //relaxes the requirement to decrease the obj function at each iter step;
+  //may turn very efficient in the long term;
+  aSolOpt.use_nonmonotonic_steps = false;
+
+  aSolOpt.max_num_iterations = 100;
+  aSolOpt.minimizer_progress_to_stdout = true;
+  aSolOpt.num_threads = 8;
+
+  aSolOpt.use_inner_iterations = false;
+
+}
+
 void cAppCovInMotion::SetMinimizer(ceres::Solver::Options& aSolOpt)
 {
   //S - the reduced camera matrix / the Shur complement;
@@ -867,8 +929,86 @@ bool cAppCovInMotion::OptimizeRelMotions()
         }
     }
 
-    return true;
+    return EXIT_SUCCESS;
 
+}
+
+bool cAppCovInMotion::OptimizeRelMotionsGlobally()
+{
+    ceres::Problem * aProblem = new ceres::Problem;;
+    ceres::Solver::Summary        aSummary;
+
+
+    //add equation for each view and camera 
+    for(auto view_i : mTriSet->mAllViewMap)
+    {
+
+        //similitude
+        Mat3d alpha = view_i.second->alpha();
+        Vec3d beta  = view_i.second->beta();
+        double lambda = view_i.second->lambda();
+
+
+        int NbCam = (&(view_i.second->View(2))==NULL) ? 2 : 3;
+        for (int aCam=0; aCam<NbCam; aCam++)
+        {
+            //local pose 
+            Vec3d c (view_i.second->View(aCam).C()[0], 
+                     view_i.second->View(aCam).C()[1],
+                     view_i.second->View(aCam).C()[2]);
+            Mat3d r =  view_i.second->View(aCam).R();
+            //double*  aW = view_i->View(aCam).Omega(); to consider including it
+
+            //initial global pose
+            cPose*& pose = mTriSet->Pose(view_i.second->View(aCam).Name());
+            //constant 
+            Mat3d R0 = pose->R();
+            //parameters 
+            double* C = pose->C();
+            double* W = pose->Omega();
+           
+            //covariance 
+            int loc = aCam*6;
+            Mat6d cov = view_i.second->Hg_().H_().block(loc,loc,6,6);
+
+            //std::cout << cov << "\n";
+
+            CostFunction * aCost = 
+                cResidualOnViewPose::Create(alpha,beta,lambda,r,c,R0,cov);
+
+            LossFunction * aLoss = new HuberLoss(_HUBER_g);
+            
+            aProblem->AddResidualBlock(aCost,aLoss,C,W);
+        }
+
+    }
+
+    //add constraint on initial global poses 
+    for (auto pose_i : mTriSet->mGlobalPoses)
+    {
+        //parameters 
+        double* C = pose_i.second->C();
+        double* W = pose_i.second->Omega();
+
+        //perspective center
+        CostFunction * CostC = cPoseConstraint::Create(C,_T_PDS_g);
+        aProblem->AddResidualBlock(CostC,NULL,(C));
+
+        //small rotation
+        CostFunction * CostR = cPoseConstraint::Create(W,_ROT_PDS_g);
+        aProblem->AddResidualBlock(CostR,NULL,(W));
+
+    }
+
+    //solve the least squares problem
+    ceres::Solver::Options Opts;
+    SetMinimizerGlobal(Opts);
+
+    ceres::Solve(Opts,aProblem,&aSummary);
+    std::cout << aSummary.FullReport() << "\n";
+
+
+    return EXIT_SUCCESS;
 }
 
 bool cAppCovInMotion::OptimizeGlobally()
@@ -1080,6 +1220,7 @@ void cAppCovInMotion::WriteToPLYFile(const std::string& filename, const std::str
 
   }
 }
+
 cAppCovInMotion::~cAppCovInMotion()
 {
     delete mTriSet;
@@ -1090,13 +1231,15 @@ cAppCovInMotion::cAppCovInMotion(const std::string& avfile,
                                  const std::string& asimfile,
                                  const std::string& aglobpfile,
                                  const std::string& aoutpfile,
-                                 const bool get_covariances) :
+                                 const bool get_covariances,
+                                 const std::string& cov_key) :
   mviews_file(avfile),
   mfeats_file(affile),
   msimil_file(asimfile),
   mglob_p_file(aglobpfile),
   mout_p_file(aoutpfile),
-  GET_COVARIANCES(get_covariances)
+  GET_COVARIANCES(get_covariances),
+  mcov_key(cov_key)
 {
     mTriSet = new cTripletSet(avfile,asimfile,aglobpfile);
 
@@ -1116,18 +1259,15 @@ cAppCovInMotion::cAppCovInMotion(const std::string& avfile,
       PrintAllPts3d();
 
 
-
     /* Get covariances per motion */
     OptimizeRelMotions();
 
-
-    
-    //WriteGlobalPFromRelPAndSim("globalp_from_relp_check.txt");
-    //getchar();
-
-
     /* Run global bundle adjustment using "relative" covariances */
-    OptimizeGlobally();
+    OptimizeRelMotionsGlobally();
+
+    mTriSet->SaveGlobalPoses(mout_p_file);
+
+    //mTriSet->PrintAllPoses();
 
 }
 
@@ -1136,12 +1276,14 @@ int cov_in_motions_main(std::string views,
                         std::string similarities,
                         std::string global_poses,
                         std::string out_poses,
-                        bool get_covariances)
+                        bool get_covariances,
+                        std::string covariance_key)
 {
 
 
 
-  cAppCovInMotion anAp(views,tracks,similarities,global_poses,out_poses,get_covariances);
+  cAppCovInMotion anAp(views,tracks,similarities,global_poses,out_poses,
+                       get_covariances,covariance_key);
   //cAppCovInMotion anAp(aArg1,aArg2,aArg3,aArg4);
 
 
