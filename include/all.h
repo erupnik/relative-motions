@@ -3,14 +3,20 @@
 
 #include <iostream>
 #include <fstream>
+#include <iterator>
 #include <string>
 #include <vector>
 #include <map>
 #include <list>
 #include <ctime>
 
+#include <stdio.h>
+#include <omp.h>
+
 #include "Eigen/Core"
 #include "Eigen/Dense"
+
+#include <boost/program_options.hpp>
 
 typedef Eigen::MatrixXd MatXd;
 typedef Eigen::Matrix<double,18,18> Mat18d;

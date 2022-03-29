@@ -17,10 +17,11 @@ bool cResidualOnViewPose::operator()(const T* const C, const T* const W, T* Resi
     //Iw =  inv(r0) @ M @ R0 @ (I + WMat) => output is also skew
 
     //lambda * alpha * C  + beta - c = e
-    T res_cx = m_lambda * (m_alpha(0,0)*C[0] +  m_alpha(1,0)*C[1] +  m_alpha(2,0)*C[2]) + m_beta[0] - m_c0[0];
-    T res_cy = m_lambda * (m_alpha(0,1)*C[0] +  m_alpha(1,1)*C[1] +  m_alpha(2,1)*C[2]) + m_beta[1] - m_c0[1];
-    T res_cz = m_lambda * (m_alpha(0,2)*C[0] +  m_alpha(1,2)*C[1] +  m_alpha(2,2)*C[2]) + m_beta[2] - m_c0[2];
-    
+    T res_cx = m_lambda * (m_alpha(0,0)*C[0] +  m_alpha(0,1)*C[1] +  m_alpha(0,2)*C[2]) + m_beta[0] - m_c0[0];
+    T res_cy = m_lambda * (m_alpha(1,0)*C[0] +  m_alpha(1,1)*C[1] +  m_alpha(1,2)*C[2]) + m_beta[1] - m_c0[1];
+    T res_cz = m_lambda * (m_alpha(2,0)*C[0] +  m_alpha(2,1)*C[1] +  m_alpha(2,2)*C[2]) + m_beta[2] - m_c0[2];
+    //std::cout << res_cx << " " << res_cy << " " << res_cz << "\n";
+
     // r = alpha * R , global to local
     // r0 (w+I) = alpha R0 (W+I) 
     //     w+I = r0**-1 alpha * R0 * (I+W)
@@ -37,6 +38,11 @@ bool cResidualOnViewPose::operator()(const T* const C, const T* const W, T* Resi
     Residual[3] = m_cov(3,0)*res_cx + m_cov(3,1)*res_cy + m_cov(3,2)*res_cz + m_cov(3,3)*res_wx + m_cov(3,4)*res_wy + m_cov(3,5)*res_wz;
     Residual[4] = m_cov(4,0)*res_cx + m_cov(4,1)*res_cy + m_cov(4,2)*res_cz + m_cov(4,3)*res_wx + m_cov(4,4)*res_wy + m_cov(4,5)*res_wz;
     Residual[5] = m_cov(5,0)*res_cx + m_cov(5,1)*res_cy + m_cov(5,2)*res_cz + m_cov(5,3)*res_wx + m_cov(5,4)*res_wy + m_cov(5,5)*res_wz;
+
+    /*std::cout << "res pure: " << res_cx << " " << res_cy << " " << res_cz << " " 
+                              << res_wx << " " << res_wy << " " << res_wz << "\n";
+    std::cout << "Residuals : " << Residual[0] << " " << Residual[1] << " " << Residual[2] << " " 
+                                << Residual[3] << " " << Residual[4] << " " << Residual[5] << "\n";*/
 
     return true;
 }

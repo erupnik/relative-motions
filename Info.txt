@@ -1,63 +1,9 @@
-global to local transformation:
-      pose = s * alpha * Pose + beta
-
-
-// - pose and Pose are extrinsic parameters
-    // - {s, alpha, beta} describe transformation from absolute 3D to relative 3D
-    // - P and P_ are 3D pts in relative and absolute frames respectively
-     res = ( Fn(P) - p )                                 //local
-         =   I(Proj(          pose(P)           )) -p    //local
-         =   I(Proj( s * alpha * Pose(P_) + beta   )) -p    //
-
-         = I(Proj( simil( Pose(P_) ) )) => global   ->   local     ->   projection  -> calib
-                                          (p3d^g)    s   (p3d^l)  proj    (p3q)     I  (p2d)
-
-    derivatives (2months later),
-         (alpha,beta) are constants:
-           res =  J_p2d_p3q @ J_p3q_p3d^l @ J_p3d^l_rt @ J_rt_RT
-         (alpha,beta) are NOT constants:
-           res' =  J_p2d_p3q @ J_p3q_p3d^l @ J_p3d^l_rt @ J_rt_simil @ J_simil_RT
-
-        J_rt_RT    => s * alpha //because "Pose" is actualy already dPose
-        
-        J_rt_simil => [ J_rt_s     | J_rt_alpha     | J_rt_beta ] = 
-                      [ alpha*Pose | s @ [1,1,1]x   | I_vec     ]
-        J_simil_RT => identity, this is already dRT becuase Pose is dPose
-
-    J = d_res/d_delta =
-             d_Fn / d_delta = d_I/d_(Xq,Yq) @               //
-                              d_Proj/d_(Xc,Yc,Zc) @         //
-                              d_pose/d_(r,t) @              //============
-                              d_Pose/d_(R,T)                //
-                            = J_p2d_p3q @ J_p3q_p3d @ J_p3d_rt @ J_rt_RT
-                            = J_ @ J_rt_RT
-   J' = d_res'/d_delta =
-             d_Fn / d_delta = d_I/d_(Xq,Yq) @               
-                              d_Proj/d_(Xc,Yc,Zc) @         
-                              d_pose/d_(r,t) @             
-                              d_pose/d(s,alpha,beta) @ 
-                              d_Pose/d_(R,T)                
-                            = J_p2d_p3q @ J_p3q_p3d @ J_p3d_rt @ J_rt_simil @ J_rt_RT
-                            = J_ @ J_rt_simil @ J_rt_RT
-
-
-===================
-MM
-*@@ -1511,6 +1511,19 @@ Im1D_REAL8  L2SysSurResol::Solve(bool * aResOk)
-          mSolL2.data()[kx] = x(0,kx);
-     }
-     mResiduAfterSol  =  ResiduOfSol(mSolL2.data());
-+
-+	Im2D_REAL8 aCoVTest (mNbVar,mNbVar,0.0);
-+	REAL8 ** aDCoVTest(aCoVTest.data());
-+
-+	for (int aK1=0; aK1<mNbVar; aK1++)
-+	{
-+		for (int aK2=0; aK2<mNbVar; aK2++)
-+		{
-+			aDCoVTest[aK1][aK2] += ElSquare(mResiduAfterSol) * mDataInvtLi_Li[aK1][aK2] * mDataInvtLi_Li[aK2][aK1]; //missing *Li?
-+		}
-+	}
-+
-+
-
+TODO:
+- make sure you're using the same calibrations
+- LOSS: 
+    analyse residuals pure and after cov weighting
+    analyse the COV values 
+    analyse the observation error distribution to adapt loss params
+- CMP:  
+    see what happens if COVs are identity
+    compare with campari/BA

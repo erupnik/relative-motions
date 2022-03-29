@@ -4,9 +4,6 @@ project(cov_in_motions)
 set(BUILD_PATH_BIN  ${PROJECT_SOURCE_DIR}/bin CACHE PATH "binaires install path")
 set(INSTALL_DIR ${BUILD_PATH_BIN})
 
-#set(g2o_DIR "/home/er/Documents/d_development/MMVII/TestER/thirdparty/g2o")
-#set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${g2o_DIR}/cmake_modules/")
-
 
 find_package(Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
@@ -14,13 +11,17 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 find_package(Ceres REQUIRED)
 include_directories(${CERES_INCLUDE_DIRS})
 
-#find_package(glog)
+find_package(Boost COMPONENTS program_options REQUIRED)
+include_directories(${Boost_INCLUDE_DIRS})
+
 find_package(gflags)
 
-#OPTION(WITH_G2O "Build g2o" OFF)
-#if (WITH_G2O)
-#    add_subdirectory(src)
-#endif()
+find_package(OpenMP)
+if (OPENMP_FOUND)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+endif()
 
 include_directories("include")
 include_directories("src")
@@ -40,7 +41,7 @@ add_executable("triplet_utils" "src/triplet_utils_main.cpp" "src/triplet_utils.c
 #add_executable("bench" "src/check_propagation.cpp" "src/cov_in_motions.cpp" "src/bundle.cpp" )
 
 
-target_link_libraries(${PROJECT_NAME} ${CERES_LIBRARIES} ) #
+target_link_libraries(${PROJECT_NAME} ${CERES_LIBRARIES} ${Boost_LIBRARIES} ) #
 target_link_libraries("triplet_utils" ${CERES_LIBRARIES} ) #
 #target_link_libraries("bench" ${CERES_LIBRARIES} ) #
 

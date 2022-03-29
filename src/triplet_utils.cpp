@@ -37,7 +37,7 @@ std::vector<std::string> cTripletSet::DecompViewNames(std::string& name)
 
 bool cTripletSet::ReadViews()
 {
-    
+
     FILE* fptr = fopen(mviews_file.c_str(), "r");
     if (fptr == NULL) {
        return false;
@@ -57,7 +57,7 @@ bool cTripletSet::ReadViews()
         std::vector<std::string> aPoseNameV;
         for (int aK=0; aK<aNbV; aK++)
         {
-            char aName[50];
+            char aName[60];
             fscanf(fptr, "%s", aName);
             aPoseNameV.push_back(aName);
  
@@ -137,16 +137,20 @@ bool cTripletSet::ReadViews()
     
     fclose(fptr);
 
+    std::cout << " #" << mAllViewMap.size() << " views\n";
+
     return EXIT_SUCCESS;
 }
 
 bool cTripletSet::ReadSimGlobal()
 {
+
     FILE* fptr = fopen(msimil_file.c_str(), "r");
     if (fptr == NULL) {
       return false;
     };
 
+    int Num=0;
     int OK=1;
 
     while (!std::feof(fptr)  && !ferror(fptr))
@@ -161,7 +165,7 @@ bool cTripletSet::ReadSimGlobal()
         std::vector<std::string> aPoseNameV;
         for (int aK=0; aK<aNbV; aK++)
         {
-            char aName[50];
+            char aName[60];
             fscanf(fptr, "%s", aName);
             aPoseNameV.push_back(aName);
 
@@ -192,6 +196,7 @@ bool cTripletSet::ReadSimGlobal()
             getchar();*/
 
             mAllViewMap[aViewName]->SetInit();
+            Num++;
         }
         else
         {
@@ -200,6 +205,8 @@ bool cTripletSet::ReadSimGlobal()
             {
                 fscanf(fptr, "%lf", &i);
             }
+
+
         }
 
     }
@@ -219,6 +226,8 @@ bool cTripletSet::ReadSimGlobal()
     }
 
     fclose(fptr);
+
+    std::cout << " #" << Num << " similarity transformations\n";
 
     return EXIT_SUCCESS;
 }
@@ -252,6 +261,7 @@ bool cTripletSet::ReadRotTrS(FILE* fptr,Mat3d& alpha,Vec3d& beta,double& s)
 
 bool cTripletSet::ReadGlobalPoses()
 {
+    
     FILE* fptr = fopen(mglob_p_file.c_str(), "r");
     if (fptr == NULL) {
       return false;
@@ -263,9 +273,11 @@ bool cTripletSet::ReadGlobalPoses()
         Mat3d aR;
         double * aT = new double [3];
 
-        char aName[20];
+        char aName[60];
         OK = fscanf(fptr, "%s", aName);
         std::string PoseName = std::string(aName);
+        //std::cout << PoseName << "\n";
+
 
         for (int aK1=0; aK1<3; aK1++)
         {
@@ -287,11 +299,15 @@ bool cTripletSet::ReadGlobalPoses()
             //mGlobalPoses[PoseName]->Show();
             //getchar();
         }
-        
+
+        if (!OK)
+            return EXIT_SUCCESS;
     }
    
     fclose(fptr);
 
+    std::cout << " #" << mGlobalPoses.size() << " inital global poses\n";
+    
     return EXIT_SUCCESS;
 }
 
@@ -334,6 +350,7 @@ void cTripletSet::LocalToGlobal(cNviewPoseX* pose,const int& view, Mat3d& R,Vec3
     R = alpha.inverse() * r;
     C = 1.0/lambda * alpha.inverse() * (c - beta);
 
+    //lambda * alpha * C + beta = c 
 }
 
 void cTripletSet::SaveGlobalPoses(const std::string& filename)
@@ -343,24 +360,26 @@ void cTripletSet::SaveGlobalPoses(const std::string& filename)
 
     for (auto pose : mGlobalPoses)
     {
-
-        cPose * pose0 = mGlobalPoses[pose.first];
-        
-        Mat3d dW;
-        dW << 1,                 -pose0->Omega()[2], pose0->Omega()[1],
-              pose0->Omega()[2],    1,              -pose0->Omega()[0],
-             -pose0->Omega()[1], pose0->Omega()[0],             1;
-
-
-        Mat3d newR = pose0->R()*dW;
-        //pose0->Show();
-
-        eo_file << pose.first << " " << newR(0,0) << " " << newR(0,1) << " " << newR(0,2)
-                              << " " << newR(1,0) << " " << newR(1,1) << " " << newR(1,2)
-                              << " " << newR(2,0) << " " << newR(2,1) << " " << newR(2,2)
-                              << " " << pose0->C()[0]
-                              << " " << pose0->C()[1]
-                              << " " << pose0->C()[2] << "\n";
+        if (pose.second->IsRefined())
+        {
+            cPose * pose0 = mGlobalPoses[pose.first];
+            
+            Mat3d dW;
+            dW << 1,                 -pose0->Omega()[2], pose0->Omega()[1],
+                  pose0->Omega()[2],    1,              -pose0->Omega()[0],
+                 -pose0->Omega()[1], pose0->Omega()[0],             1;
+         
+         
+            Mat3d newR = pose0->R()*dW;
+            //pose0->Show();
+         
+            eo_file << pose.first << " " << newR(0,0) << " " << newR(0,1) << " " << newR(0,2)
+                                  << " " << newR(1,0) << " " << newR(1,1) << " " << newR(1,2)
+                                  << " " << newR(2,0) << " " << newR(2,1) << " " << newR(2,2)
+                                  << " " << pose0->C()[0]
+                                  << " " << pose0->C()[1]
+                                  << " " << pose0->C()[2] << "\n";
+        }
     }
     eo_file.close();
 

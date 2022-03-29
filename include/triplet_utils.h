@@ -16,7 +16,7 @@ class cTripletSet
                     std::string gpose="") : 
             mviews_file(views),  
             msimil_file(simil),
-            mglob_p_file(gpose) {}
+            mglob_p_file(gpose) { std::cout << "Initialization\n"; }
         ~cTripletSet(){};
 
         bool ReadViews();
