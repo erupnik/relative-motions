@@ -641,8 +641,8 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
   }
 
     //solve the least squares problem
-    ceres::Solver::Options aOpts;
-    SetCeresOptions(aOpts);
+    //ceres::Solver::Options aOpts;
+    //SetCeresOptions(aOpts);
 
     //ceres::Solve(aOpts,aProblem,&aSummary);
     //std::cout << aSummary.FullReport() << "\n";
@@ -925,6 +925,30 @@ Eigen::SparseMatrix<double> cAppCovInMotion::MapJacToSparseM(CRSMatrix* J)
     return A;
 }
 
+void cAppCovInMotion::SetMinimizerLocal(ceres::Solver::Options& aSolOpt)
+{
+  //S - the reduced camera matrix / the Shur complement;
+  //uses the SHURR trick; solves S as a dense matrix with Cholesky factorization; i
+  //for problems up to several hundreds of cameras
+  aSolOpt.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;//ceres::DENSE_SCHUR;
+  //uses the SHURR trick; solves S as a sparse matrix with Cholesky factorization;
+  //aSolOpt.linear_solver_type = ceres::SPARSE_SCHUR;
+  //applies Preconditioned Conjugate Gradients to S; implements inexact step algorithm;
+  //choose a precondition, e.g. CLUSTER_JACOBI,CLUSTER_TRIDIAGONAL that exploits camera-point visibility structure
+  //mSolopt.linear_solver_type = ceres::ITERATIVE_SHUR;
+
+  //relaxes the requirement to decrease the obj function at each iter step;
+  //may turn very efficient in the long term;
+  aSolOpt.use_nonmonotonic_steps = false;
+
+  aSolOpt.max_num_iterations = 100;
+  aSolOpt.minimizer_progress_to_stdout = true;
+  aSolOpt.num_threads = 8;
+
+  aSolOpt.use_inner_iterations = m_lba_opts._INNER_ITER;
+
+}
+
 //final, global least-squares simultaneously on all poses  
 void cAppCovInMotion::SetMinimizerGlobal(ceres::Solver::Options& aSolOpt)
 {
@@ -946,41 +970,10 @@ void cAppCovInMotion::SetMinimizerGlobal(ceres::Solver::Options& aSolOpt)
   aSolOpt.minimizer_progress_to_stdout = true;
   aSolOpt.num_threads = 8;
 
-  aSolOpt.use_inner_iterations = false;
+  aSolOpt.use_inner_iterations = m_gba_opts._INNER_ITER;
 
 }
 
-void cAppCovInMotion::SetMinimizer(ceres::Solver::Options& aSolOpt)
-{
-  //S - the reduced camera matrix / the Shur complement;
-  //uses the SHURR trick; solves S as a dense matrix with Cholesky factorization; i
-  //for problems up to several hundreds of cameras
-  aSolOpt.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;//ceres::DENSE_SCHUR;
-  //uses the SHURR trick; solves S as a sparse matrix with Cholesky factorization;
-  //aSolOpt.linear_solver_type = ceres::SPARSE_SCHUR;
-  //applies Preconditioned Conjugate Gradients to S; implements inexact step algorithm;
-  //choose a precondition, e.g. CLUSTER_JACOBI,CLUSTER_TRIDIAGONAL that exploits camera-point visibility structure
-  //mSolopt.linear_solver_type = ceres::ITERATIVE_SHUR;
-
-  //relaxes the requirement to decrease the obj function at each iter step;
-  //may turn very efficient in the long term;
-  aSolOpt.use_nonmonotonic_steps = false;
-
-  aSolOpt.max_num_iterations = 1;
-  aSolOpt.minimizer_progress_to_stdout = true;
-  /*aSolOpt.num_threads = 20;*/
-
-  aSolOpt.use_inner_iterations = false;
-
-}
-
-void cAppCovInMotion::SetCeresOptions(ceres::Solver::Options& aSolOpt)
-{
-  SetMinimizer(aSolOpt);
-  //SetOrdering();
-
-
-}
 
 void cAppCovInMotion::InitCovariances(cNviewPoseX*& views,std::string views_name)
 {
@@ -1146,9 +1139,13 @@ bool cAppCovInMotion::OptimizeRelMotionsGlobally()
                 <<  ", Max residual: " << res_max << "\n";
     }
 
+    /* Update the similarity transformation */
+    mTriSet->UpdateAllAffine();
+
     return EXIT_SUCCESS;
 }
 
+//obsolete
 bool cAppCovInMotion::OptimizeGlobally()
 {
       std::cout << "\nOptimize globally " <<  "\n";
@@ -1402,13 +1399,14 @@ cAppCovInMotion::cAppCovInMotion(const InputFiles& inputs,
           mTriSet->PrintAllViews();
         if (0)
           PrintAllPts3d();
- 
+
  
         /* Get covariances per motion */
         OptimizeRelMotions();
  
         /* Run global bundle adjustment using "relative" covariances */
         OptimizeRelMotionsGlobally();
+        //OptimizeRelMotionsGlobally();
  
         mTriSet->SaveGlobalPoses(inputs.output_poses_file);
 

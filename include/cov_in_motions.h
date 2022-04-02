@@ -326,8 +326,7 @@ class cAppCovInMotion
     bool BuildProblem_(cNviewPoseX*&,std::string);
     void InitCovariances(cNviewPoseX*&,std::string);
 
-    void SetCeresOptions(ceres::Solver::Options&);
-    void SetMinimizer(ceres::Solver::Options&);
+    void SetMinimizerLocal(ceres::Solver::Options&);
     void SetMinimizerGlobal(ceres::Solver::Options&);
     bool OptimizeRelMotions();
     bool OptimizeRelMotionsGlobally();

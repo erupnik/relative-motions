@@ -31,7 +31,7 @@ bool cResidualOnViewPose::operator()(const T* const C, const T* const W, T* Resi
     T res_wy = m_r0_inv_alpha_R0(0,0)*W[1] + m_r0_inv_alpha_R0(0,1)*(-W[0]) + m_r0_inv_alpha_R0(0,2)*1; //wy (0,2)
     T res_wz = m_r0_inv_alpha_R0(1,0)*1 + m_r0_inv_alpha_R0(1,1)*(W[2]) + m_r0_inv_alpha_R0(1,2)*(-W[1]); //wz (1,0)
 
-    //apply covariances 
+    //weigh by the hessian = 1/sigma 
     Residual[0] = m_cov(0,0)*res_cx + m_cov(0,1)*res_cy + m_cov(0,2)*res_cz + m_cov(0,3)*res_wx + m_cov(0,4)*res_wy + m_cov(0,5)*res_wz; 
     Residual[1] = m_cov(1,0)*res_cx + m_cov(1,1)*res_cy + m_cov(1,2)*res_cz + m_cov(1,3)*res_wx + m_cov(1,4)*res_wy + m_cov(1,5)*res_wz;
     Residual[2] = m_cov(2,0)*res_cx + m_cov(2,1)*res_cy + m_cov(2,2)*res_cz + m_cov(2,3)*res_wx + m_cov(2,4)*res_wy + m_cov(2,5)*res_wz;

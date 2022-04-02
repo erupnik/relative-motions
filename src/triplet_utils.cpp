@@ -1,6 +1,8 @@
 #include "triplet_utils.h"
 
 extern int main(int argc,char** argv);
+extern double euclid(Vec3d );
+static Mat3d NearestRotation(Mat3d&);
 
 //std::string _DELIMITER_ = "-zyx-";
 
@@ -334,6 +336,117 @@ void cTripletSet::PrintAllPoses()
     }
 }
 
+void cTripletSet::UpdateAllAffine()
+{
+    for (auto view_i : mAllViewMap)
+    {
+        AffineFromLocGlob(view_i.second);
+    }
+}
+
+static double SetToMatDirecte(Eigen::MatrixXd& Mat)
+{
+   if (Mat.determinant() >0)
+     return 1;
+
+   for (int y=0; y<Mat.cols() ; y++)
+       Mat(0,y) *= -1;
+   return -1;
+}
+
+
+static Mat3d NearestRotation(Mat3d& rot)
+{
+    Eigen::MatrixXd U, V;
+
+    Eigen::JacobiSVD<Eigen::MatrixXd> svd(rot,Eigen::ComputeThinU | Eigen::ComputeThinV);
+
+    Eigen::VectorXd SVec = svd.singularValues();
+    U = svd.matrixU();
+    V = svd.matrixV();
+
+    Mat3d S = Mat3d::Zero(3,3);
+    S(0,0) = SVec(0);
+    S(1,1) = SVec(1);
+    S(2,2) = SVec(2);
+
+    double sign = SetToMatDirecte(U) * SetToMatDirecte(V);
+    if (sign < 0)
+        S(0,0) *= -1;
+    V.transposeInPlace();
+
+
+    Mat3d Mul;
+    for (int i=0; i<3; i++)
+        Mul(i,i) = (S(i,i) > 0) ? 1 : -1;
+    
+
+    return U * Mul * V;
+
+
+}
+
+void cTripletSet::AffineFromLocGlob(cNviewPoseX* view_i)
+{
+    bool TVIEW = (view_i->NbView()==3) ? 1 : 0;
+    double NbDiv = 1/double(view_i->NbView());
+
+    Mat3d alpha_ = Mat3d::Zero(3,3);
+    Vec3d beta_  = Vec3d::Zero(3);
+
+
+    //current global poses
+    cPose*& Pose1 = this->Pose(view_i->View(0).Name());
+    cPose*& Pose2 = this->Pose(view_i->View(1).Name());
+
+    
+    Vec3d C1 (Pose1->C()[0], Pose1->C()[1], Pose1->C()[2]);
+    Vec3d C2 (Pose2->C()[0], Pose2->C()[1], Pose2->C()[2]);
+    Vec3d C3 (TVIEW ? Pose(view_i->View(2).Name())->C()[0] : 0, 
+              TVIEW ? Pose(view_i->View(2).Name())->C()[1] : 0, 
+              TVIEW ? Pose(view_i->View(2).Name())->C()[2] : 0);
+
+
+    //current local poses 
+    Vec3d c1 (view_i->View(0).C()[0],
+              view_i->View(0).C()[1],
+              view_i->View(0).C()[2]);
+    Vec3d c2 (view_i->View(1).C()[0], 
+              view_i->View(1).C()[1],
+              view_i->View(1).C()[2]);
+    Vec3d c3 ( TVIEW ? view_i->View(2).C()[0] : 0, 
+               TVIEW ? view_i->View(2).C()[1] : 0,
+               TVIEW ? view_i->View(2).C()[2] : 0);
+
+    
+
+    //lambda 
+    double L1 = euclid(c1 - c2) / euclid(C1 - C2);
+    double L2 = euclid(c1 - c3) / euclid(C1 - C3);
+    view_i->lambda() = (L1 + L2) / ((TVIEW) ? 2 : 1);
+
+    //rotation  Rk = rk_i * Ri^-1
+    Mat3d Rk_i = view_i->View(0).R() * Pose1->R().transpose();
+    Mat3d Rk_j = view_i->View(1).R() * Pose2->R().transpose();
+    Mat3d MZ = Mat3d::Zero(3,3);
+    Mat3d Rk_m = (TVIEW) ? (view_i->View(2).R() * (Pose(view_i->View(2).Name()))->R().transpose()) : MZ;
+   
+
+    Mat3d Rk_accum = (Rk_i+Rk_j+Rk_m)*NbDiv;
+    view_i->alpha() = NearestRotation(Rk_accum);
+
+    //translation Ck = ck_i - lambda * Rk * Ci
+    Vec3d RkC_1 = view_i->alpha() * C1;
+    Vec3d RkC_2 = view_i->alpha() * C2;
+    Vec3d RkC_3 = view_i->alpha() * C3;
+    Vec3d Ck_1 = c1 - view_i->lambda() * RkC_1;
+    Vec3d Ck_2 = c2 - view_i->lambda() * RkC_2; 
+    Vec3d Ck_3 = c3 - view_i->lambda() * RkC_3; 
+
+    view_i->beta() = (Ck_1+Ck_2+Ck_3)*NbDiv;
+
+}
+
 void cTripletSet::LocalToGlobal(cNviewPoseX* pose,const int& view, Mat3d& R,Vec3d& C)
 {
     //pose->Show();
@@ -629,7 +742,7 @@ double cFilterTrip::FindQuantile(std::vector<double>& v, double p)
     return (*quantile);
 }
 
-double cFilterTrip::euclid(Vec3d pt)
+double euclid(Vec3d pt)
 {
     return std::sqrt(pt[0]*pt[0]+pt[1]*pt[1]+pt[2]*pt[2]);
 }

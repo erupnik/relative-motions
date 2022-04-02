@@ -49,6 +49,7 @@ int main(int argc,char** argv)
             ("gba_C_pds", po::value<double>(), "global BA: center PDS")
             ("gba_loss_sim", po::value<double>(), "global BA: Huber loss threshold for similarities")
             ("gba_loss_gp", po::value<double>(), "global BA: Huber loss threshold for global poses")
+            ("gba_inner_iter", po::value<bool>(), "global BA: Use inner iterations")
             
             ("ceres_cov", po::value<bool>(), "internal: compute ceres covariance")
             ("verbosity", po::value<int>(), "verbosity level (glog logging)")
@@ -148,6 +149,9 @@ int main(int argc,char** argv)
 
         if (vmap.count("gba_loss_gp")) 
             gba_opts._HUBER_P = vmap["gba_loss_gp"].as<double>() ;
+
+        if (vmap.count("gba_inner_iter")) 
+            gba_opts._INNER_ITER = vmap["gba_inner_iter"].as<bool>() ;
 
 
 

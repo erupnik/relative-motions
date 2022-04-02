@@ -26,6 +26,8 @@ class cTripletSet
         void PrintAllPoses();
 
         void LocalToGlobal(cNviewPoseX*,const int& view,Mat3d&,Vec3d&);
+        void AffineFromLocGlob(cNviewPoseX*); 
+        void UpdateAllAffine();
 
         void WriteGlobalPFromRelPAndSim(const std::string& );
         void SaveGlobalPoses(const std::string&);
@@ -66,7 +68,6 @@ class cFilterTrip
         double DistanceRot(const Mat3d& R1,const Vec3d& C1, const Mat3d& R2,const Vec3d& C2);
         double DistBase(Vec3d B1,Vec3d aB2);
         double scal (const Vec3d& p1,const Vec3d& p2);
-        double euclid(Vec3d pt);
 
         void SaveViews(cTripletSet&,const std::list<std::string>&,std::string);
 

@@ -21,6 +21,9 @@ struct GlobalBundleOptions
         // (in the units of the global poses)
         double _HUBER_P=0.001;
 
+        //use inner iterations
+        bool _INNER_ITER=false;
+
     private:
 };
 
@@ -62,6 +65,9 @@ struct LocalBundleOptions
 
         // covariance file key
         std::string _KEY = "_log";
+
+        //use inner iterations
+        bool _INNER_ITER=false;
 
     private:
 
