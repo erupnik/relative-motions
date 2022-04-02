@@ -52,7 +52,6 @@ int main(int argc,char** argv)
             ("gba_inner_iter", po::value<bool>(), "global BA: Use inner iterations")
             
             ("ceres_cov", po::value<bool>(), "internal: compute ceres covariance")
-            ("verbosity", po::value<int>(), "verbosity level (glog logging)")
 ;
 
        
