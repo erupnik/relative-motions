@@ -155,7 +155,8 @@ int main(int argc,char** argv)
 
 
         // run main program 
-        cov_in_motions_main(inputs,lba_opts,gba_opts,
+        cov_in_motions_main(inputs,
+                            lba_opts,gba_opts,
                             ceres_covariance);
         
     }
