@@ -588,16 +588,15 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
       {
         if (aCam==1)
         {
-          ceres::SubsetParameterization *constant_base_parameterization = NULL;
-          std::vector<int> constant_translation;
-          constant_translation.push_back(0);//x component
-
-          constant_base_parameterization =
-              new ceres::SubsetParameterization(3, constant_translation);
-
-          aProblem->SetParameterization(aC, constant_base_parameterization);
-
-          //std::cout << "_GAUGE_BASE_FIX" << "\n";
+	    ceres::SubsetManifold* constant_base_manifold = nullptr;
+            std::vector<int> constant_translation;
+            constant_translation.push_back(0);//x component
+	    
+	    constant_base_manifold = new
+		    ceres::SubsetManifold(3, constant_translation);
+          
+	    aProblem->SetManifold(aC, constant_base_manifold);
+            //std::cout << "_GAUGE_BASE_FIX" << "\n";
 
         }
       }
@@ -943,7 +942,7 @@ void cAppCovInMotion::SetMinimizerLocal(ceres::Solver::Options& aSolOpt)
 
   aSolOpt.max_num_iterations = 100;
   aSolOpt.minimizer_progress_to_stdout = true;
-  aSolOpt.num_threads = 8;
+  aSolOpt.num_threads = _PROC_COUNT;
 
   aSolOpt.use_inner_iterations = m_lba_opts._INNER_ITER;
 
@@ -968,7 +967,7 @@ void cAppCovInMotion::SetMinimizerGlobal(ceres::Solver::Options& aSolOpt)
 
   aSolOpt.max_num_iterations = 100;
   aSolOpt.minimizer_progress_to_stdout = true;
-  aSolOpt.num_threads = 8;
+  aSolOpt.num_threads = _PROC_COUNT;
 
   aSolOpt.use_inner_iterations = m_gba_opts._INNER_ITER;
 
@@ -994,7 +993,7 @@ bool cAppCovInMotion::OptimizeRelMotions()
     
     std::vector<std::string> views_to_del_by_key;
 
-    #pragma omp parallel num_threads(8) 
+    #pragma omp parallel num_threads(_PROC_COUNT) 
     {
         #pragma omp for
         for(int vi=0; vi<mTriSet->mAllViewMap.size(); vi++) 
@@ -1368,7 +1367,7 @@ cAppCovInMotion::cAppCovInMotion(const InputFiles& inputs,
                     const bool do_extra_cov_check) :
     GET_COVARIANCES(do_extra_cov_check)
 {
-
+    std::cout << _PROC_COUNT << "\n";
 
     try 
     {
@@ -1413,7 +1412,7 @@ cAppCovInMotion::cAppCovInMotion(const InputFiles& inputs,
     }
     catch (std::exception& e)
     {
-        std::cerr << "error: " << e.what() << "\n";
+        std::cerr << "Error: " << e.what() << "\n";
     }
     catch(...) 
     {
