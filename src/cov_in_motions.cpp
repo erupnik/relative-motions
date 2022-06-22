@@ -172,6 +172,35 @@ Vec3d& cPose::C_()
     return mC_;
 }
 
+void cPose::ShowImmutable() const
+{
+    std::cout << "============ " << mName << " immutable ============" << "\n";
+    std::cout << "R0\n";
+    for (int aK1=0; aK1<3; aK1++)
+    {
+        for (int aK2=0; aK2<3; aK2++)
+            std::cout << "\t" << mR(aK1,aK2) << " ";
+
+        std::cout << "\n" ;
+    }
+    std::cout << "Omega\n";
+    for (int aK1=0; aK1<3; aK1++)
+    {
+        std::cout << "\t" << mOmega_immutable[aK1] << " ";
+    }
+  
+    std::cout << "C \t" << mC_immutable[0] << " " << mC_immutable[1] << " " << mC_immutable[2] << "\n";
+
+    std::cout << "Delta Omega / delta C\n";
+    for (int aK1=0; aK1<3; aK1++)
+    {
+        std::cout << "\t" << mOmega[aK1] - mOmega_immutable[aK1] << " \t";
+    }
+  
+    std::cout << mC[0] - mC_immutable[0] << " " << mC[1] - mC_immutable[1] << " " << mC[2] - mC_immutable[2] << "\n";
+
+}
+
 void cPose::Show() const
 {
     std::cout << "============ " << mName << " ============" << "\n";
@@ -225,7 +254,7 @@ void cPoseBasic::Show() const
 }
 
 /*********** VIEWS  *******************/
-template <typename T, typename U>
+/*template <typename T, typename U>
 bool cNviewPoseT<T,U>::propagate_cov()
 {
     if (_COV_PROP)
@@ -313,7 +342,7 @@ bool cNviewPoseX::propagate_cov(Mat3d& Rg0,Mat3d& Rg1,Mat3d& Rg2)
 
     _COV_PROP = true;
     return _COV_PROP;
-}
+}*/
 
 bool cAppCovInMotion::ReadFeatures(std::string tracks_file)
 {
@@ -959,7 +988,7 @@ void cAppCovInMotion::SetMinimizerGlobal(ceres::Solver::Options& aSolOpt)
   //aSolOpt.linear_solver_type = ceres::SPARSE_SCHUR;
   //applies Preconditioned Conjugate Gradients to S; implements inexact step algorithm;
   //choose a precondition, e.g. CLUSTER_JACOBI,CLUSTER_TRIDIAGONAL that exploits camera-point visibility structure
-  //mSolopt.linear_solver_type = ceres::ITERATIVE_SHUR;
+  //aSolOpt.linear_solver_type = ceres::ITERATIVE_SCHUR;
 
   //relaxes the requirement to decrease the obj function at each iter step;
   //may turn very efficient in the long term;
@@ -1040,9 +1069,10 @@ bool cAppCovInMotion::OptimizeRelMotionsGlobally()
     {
 
         //similitude
-        Mat3d alpha = view_i.second->alpha();
-        Vec3d beta  = view_i.second->beta();
-        double lambda = view_i.second->lambda();
+        Mat3d alpha0 = view_i.second->alpha0();
+        double* Walpha = view_i.second->Walpha();
+        double* beta  = view_i.second->beta();
+        double* lambda = view_i.second->lambda();
 
 
         int NbCam = (&(view_i.second->View(2))==NULL) ? 2 : 3;
@@ -1067,21 +1097,27 @@ bool cAppCovInMotion::OptimizeRelMotionsGlobally()
             int loc = aCam*6;
             Mat6d cov = view_i.second->Hg_().H_().block(loc,loc,6,6);
 
-            //std::cout << cov << "\n";
-
-            CostFunction * aCost = 
-                cResidualOnViewPose::Create(alpha,beta,lambda,r,c,R0,cov);
+    
+            /*CostFunction * aCost = 
+                cResidualOnViewPose::Create(alpha0,beta,lambda,r,c,R0,cov);
 
             LossFunction * aLoss = new HuberLoss(m_gba_opts._HUBER_S);
             
-            aProblem->AddResidualBlock(aCost,aLoss,C,W);
+            aProblem->AddResidualBlock(aCost,aLoss,C,W);*/
 
+            CostFunction * aCost = 
+                cResidualOnViewPoseAffFree::Create(alpha0,r,c,R0,cov);
+
+            LossFunction * aLoss = new HuberLoss(m_gba_opts._HUBER_S);
+            aProblem->AddResidualBlock(aCost,aLoss,C,W,Walpha,beta,lambda);
+            
             //flag as refined 
             pose->SetRefined();
         }
     }
 
     //add constraint on initial global poses 
+    std::vector<ceres::ResidualBlockId> res_bloc_CR;
     for (auto pose_i : mTriSet->mGlobalPoses)
     {
         if (pose_i.second->IsRefined())
@@ -1097,13 +1133,18 @@ bool cAppCovInMotion::OptimizeRelMotionsGlobally()
             
             //perspective center
             CostFunction * CostC = cPoseConstraint::Create(C_immutable,m_gba_opts._C_PDS);
-            aProblem->AddResidualBlock(CostC,aLossC,(C));
-         
+            ceres::ResidualBlockId res_C_id = aProblem->AddResidualBlock(CostC,aLossC,(C));
+            res_bloc_CR.push_back(res_C_id);
+
             //small rotation
             CostFunction * CostR = cPoseConstraint::Create(W_immutable,m_gba_opts._ROT_PDS);
-            aProblem->AddResidualBlock(CostR,aLossW,(W));
+            ceres::ResidualBlockId res_W_id = aProblem->AddResidualBlock(CostR,aLossW,(W));
+            res_bloc_CR.push_back(res_W_id);
         }
     }
+    //TODO add constraint on initial similarity 
+    //add immutable parameters
+
 
     //solve the least squares problem
     ceres::Solver::Options Opts;
@@ -1115,25 +1156,37 @@ bool cAppCovInMotion::OptimizeRelMotionsGlobally()
     if (VLOG_IS_ON(1))
     {
         //Print residuals 
+        //FILE* file_residual = fopen("residuals.csv", "w+");
+
         double cost=aSummary.final_cost;
         Problem::EvaluateOptions eval_opts;
-        eval_opts.apply_loss_function = true;
+        eval_opts.apply_loss_function = false;
  
-        //eval_opts.parameter_blocks = param_bloc_CR;
+        eval_opts.residual_blocks = res_bloc_CR;
         std::vector<double> residuals;
  
         bool eval_success = aProblem->Evaluate(eval_opts, &cost, &residuals, nullptr, nullptr);
 
         double res_total=0;
         double res_max=0;
+        int cnt=0;
         for (auto res : residuals)
         {
             res_total+=std::abs(res);
             if (std::abs(res) > res_max)
                 res_max = std::abs(res);
 
-            VLOG(1) << " " << res << "\n";
+
+            //fprintf(file_residual, "%7.9f \n", res);
+            //fflush(file_residual); 
+
+            VLOG(1) << " " << res << ", scaled=" << ((cnt % 2) ? (res * m_gba_opts._C_PDS) : (res * m_gba_opts._ROT_PDS))  << " " 
+                           << ((cnt % 2) ? (m_gba_opts._C_PDS) : (m_gba_opts._ROT_PDS)) << "\n";
+            
+            cnt++;
         }
+        //fclose(file_residual);
+
         VLOG(1) << "\nAverage residual: " << res_total/residuals.size() 
                 <<  ", Max residual: " << res_max << "\n";
     }
@@ -1156,7 +1209,7 @@ bool cAppCovInMotion::OptimizeGlobally()
         4- Update global poses
 		5- Save new poses
     */
-
+/*
     //stores poses' names and their index
     std::map<std::string,int> poses_in_motions;
 
@@ -1175,12 +1228,6 @@ bool cAppCovInMotion::OptimizeGlobally()
                                       (a3v.second->NbView()==3) ? 
                                       mTriSet->mGlobalPoses[poses_in_motions,a3v.second->View(2).Name()]->R() : Rg3Dummy)); 
         {
-
-          /*std::cout << a3v.second->View(0).Name() << " "
-                    << a3v.second->View(1).Name() << " "
-                    << ((a3v.second->NbView()==3) ?
-                          poses_in_motions,a3v.second->View(2).Name() : " ") << "\n";
-          a3v.second->Show();*/
 
           if (!DicBoolFind(poses_in_motions,a3v.second->View(0).Name()))
             poses_in_motions[a3v.second->View(0).Name()] = pose_idx++;
@@ -1245,12 +1292,6 @@ bool cAppCovInMotion::OptimizeGlobally()
 
         Eigen::MatrixXd x = H_global.fullPivLu().solve(-g_global);
     
-/*        Eigen::SparseMatrix<double> H_global_SpM = MatToSparseM(H_global);
-
-        Eigen::SimplicialLDLT<Eigen::SparseMatrix<double> > solver;
-        solver.compute(H_global_SpM);
-        VecXd x = solver.solve(g_global);
-*/
         double relative_error = (H_global*x - g_global).norm() / g_global.norm();
         VLOG(1) << "\nThe realtive error is:\n" << relative_error << "\n";
         VLOG(1) << "\nThe determinant is:\n" << H_global.determinant() << "\n";
@@ -1260,7 +1301,7 @@ bool cAppCovInMotion::OptimizeGlobally()
         Eigen::FullPivLU<Eigen::MatrixXd> lu_decomp(H_global);
         VLOG(1) << "\nThe rank of A is " << lu_decomp.rank() << "\n";
 
-        /* Update poses and save */
+        // Update poses and save //
         std::string out_p_file = "output_poses.txt";
         std::fstream eo_file;
         eo_file.open(out_p_file.c_str(), std::istream::out);
@@ -1295,7 +1336,7 @@ bool cAppCovInMotion::OptimizeGlobally()
     }
     else
         LOG(INFO) << "0 poses to propagate.";
-
+*/
     return true;
 }
 
@@ -1398,6 +1439,8 @@ cAppCovInMotion::cAppCovInMotion(const InputFiles& inputs,
           mTriSet->PrintAllViews();
         if (0)
           PrintAllPts3d();
+        if (0)
+          mTriSet->PrintAllPoses();
 
  
         /* Get covariances per motion */
@@ -1408,6 +1451,9 @@ cAppCovInMotion::cAppCovInMotion(const InputFiles& inputs,
         //OptimizeRelMotionsGlobally();
  
         mTriSet->SaveGlobalPoses(inputs.output_poses_file);
+        
+        if (0)
+          mTriSet->PrintAllPosesDelta();
 
     }
     catch (std::exception& e)

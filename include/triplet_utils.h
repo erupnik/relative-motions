@@ -24,6 +24,7 @@ class cTripletSet
         bool ReadGlobalPoses();
         void PrintAllViews();
         void PrintAllPoses();
+        void PrintAllPosesDelta();
 
         void LocalToGlobal(cNviewPoseX*,const int& view,Mat3d&,Vec3d&);
         void AffineFromLocGlob(cNviewPoseX*); 
@@ -39,6 +40,7 @@ class cTripletSet
         friend class cFilterTrip;
 
         bool ReadRotTrS(FILE* fptr,Mat3d& alpha,Vec3d& beta,double& s);
+        bool ReadRotTrS(FILE* fptr,Mat3d& alpha,double*& beta,double*& s);
         std::vector<std::string> DecompViewNames(std::string&);
 
         std::string mviews_file;

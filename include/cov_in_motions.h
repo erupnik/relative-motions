@@ -121,6 +121,7 @@ class cPose : public cPoseGen //any pose, relative or absolute
         void SetRefined() { FLAG_Refined=true; }
 
         void Show() const;
+        void ShowImmutable() const;
 
     private:
         double*  mC;
@@ -256,6 +257,9 @@ class cNviewPoseX
                      cPoseGen* v2,
                      cPoseGen* v3,
                      cHessianGradientX* aHg) :
+                            m_Walpha(new double[3]),
+                            m_beta(new double[3]),
+                            m_lambda(new double[1]),
                             mView1(v1),
                             mView21(v2),
                             mView31(v3),
@@ -263,7 +267,20 @@ class cNviewPoseX
                             mNbV( (&(*mView31)==NULL) ? 2 : 3 ),
                             _COV_PROP(false),
                             _FLAG_OUTLIER(false),
-                            _INIT(false) {}
+                            _INIT(false) {
+                                memset(m_Walpha, 0, sizeof(int)*3);
+                                memset(m_beta, 0, sizeof(int)*3);
+                                memset(m_lambda, 0, sizeof(int)*1);
+                                m_Walpha[0] = 0;
+                                m_Walpha[1] = 0;
+                                m_Walpha[2] = 0;
+                            }
+    ~cNviewPoseX()
+    {
+        delete m_Walpha;
+        delete m_beta;
+        delete m_lambda;
+    }
 
     cPoseGen& View(int NbV)  {
          if (NbV==0) return *mView1; else if (NbV==1) return *mView21; else return *mView31; }
@@ -274,13 +291,14 @@ class cNviewPoseX
     cHessianGradientX& Hg_() {return *mHg;};
     int NbView() const {return mNbV;};
 
-    double& lambda() {return affine_trafo.lambda;}
-    Mat3d&  alpha()  {return affine_trafo.alpha;}
-    Vec3d&  beta()   {return affine_trafo.beta;}
+    double* lambda() {return m_lambda;}
+    Mat3d&  alpha0()  {return m_alpha0;}
+    double*  Walpha()   {return m_Walpha;}
+    double*  beta()   {return m_beta;}
 
-    void PrintAlpha() {std::cout << affine_trafo.alpha << "\n";}
-    void PrintBeta() {std::cout << affine_trafo.beta << "\n";}
-    void PrintLambda() {std::cout << affine_trafo.lambda << "\n";}
+    void PrintAlpha() {std::cout << m_alpha0 << "\n";}
+    void PrintBeta() {std::cout << m_beta[0] << " " << m_beta[1] << " " << m_beta[2] << "\n";}
+    void PrintLambda() {std::cout << m_lambda[0] << "\n";}
 
     bool Init() {return _INIT;}
     void SetInit() {_INIT=true;}
@@ -288,7 +306,11 @@ class cNviewPoseX
     void Show() {mView1->Show(); mView21->Show(); if (mNbV==3) mView31->Show();}
 
   private:
-    sAffine affine_trafo;
+    //sAffine         affine_trafo;
+    Mat3d           m_alpha0;
+    double*         m_Walpha;
+    double*         m_beta;
+    double*         m_lambda;
 
     cPoseGen*                            mView1; // Identity
     cPoseGen*                            mView21;

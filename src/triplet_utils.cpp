@@ -181,9 +181,10 @@ bool cTripletSet::ReadSimGlobal()
 
         if (DicBoolFind(mAllViewMap,aViewName))
         {
-            double& L = mAllViewMap[aViewName]->lambda();
-            Mat3d&  alpha = mAllViewMap[aViewName]->alpha();
-            Vec3d&  beta  = mAllViewMap[aViewName]->beta();
+            //double& L = mAllViewMap[aViewName]->lambda();
+            double* L = mAllViewMap[aViewName]->lambda();
+            Mat3d&  alpha = mAllViewMap[aViewName]->alpha0();
+            double*  beta  = mAllViewMap[aViewName]->beta();
 
             if (! ReadRotTrS(fptr,alpha,beta,L))
             {
@@ -232,6 +233,32 @@ bool cTripletSet::ReadSimGlobal()
     std::cout << " #" << Num << " similarity transformations\n";
 
     return EXIT_SUCCESS;
+}
+bool cTripletSet::ReadRotTrS(FILE* fptr,Mat3d& alpha,double*& beta,double*& s)
+{
+    bool OK;
+    //rotation
+    for (int aK1=0; aK1<3; aK1++)
+    {
+        for (int aK2=0; aK2<3; aK2++)
+        {
+            OK = fscanf(fptr, "%lf", &alpha(aK1,aK2));
+            //std::cout << alpha(aK1,aK2) << " " << aK1 << " ";
+        }
+    }
+
+    //translation
+    for (int aK=0; aK<3; aK++)
+    {
+        OK = fscanf(fptr, "%lf", &beta[aK]);
+        //std::cout << beta(aK) << " ";
+    }
+
+    //scale
+    OK = fscanf(fptr, "%lf", &s[0]);
+    //std::cout << s << " " << OK << " s";
+
+    return OK;
 }
 
 bool cTripletSet::ReadRotTrS(FILE* fptr,Mat3d& alpha,Vec3d& beta,double& s)
@@ -324,6 +351,15 @@ void cTripletSet::PrintAllViews()
             Pose.second->View(2).Show();
 
       }
+}
+void cTripletSet::PrintAllPosesDelta()
+{
+    std::cout << "Global poses:\n";
+    for (auto pose : mGlobalPoses)
+    {
+        std::cout << pose.first << "\n";
+        pose.second->ShowImmutable();
+    }
 }
 
 void cTripletSet::PrintAllPoses()
@@ -423,7 +459,7 @@ void cTripletSet::AffineFromLocGlob(cNviewPoseX* view_i)
     //lambda 
     double L1 = euclid(c1 - c2) / euclid(C1 - C2);
     double L2 = euclid(c1 - c3) / euclid(C1 - C3);
-    view_i->lambda() = (L1 + L2) / ((TVIEW) ? 2 : 1);
+    view_i->lambda()[0] = (L1 + L2) / ((TVIEW) ? 2 : 1);
 
     //rotation  Rk = rk_i * Ri^-1
     Mat3d Rk_i = view_i->View(0).R() * Pose1->R().transpose();
@@ -433,17 +469,21 @@ void cTripletSet::AffineFromLocGlob(cNviewPoseX* view_i)
    
 
     Mat3d Rk_accum = (Rk_i+Rk_j+Rk_m)*NbDiv;
-    view_i->alpha() = NearestRotation(Rk_accum);
+    view_i->alpha0() = NearestRotation(Rk_accum);
 
     //translation Ck = ck_i - lambda * Rk * Ci
-    Vec3d RkC_1 = view_i->alpha() * C1;
-    Vec3d RkC_2 = view_i->alpha() * C2;
-    Vec3d RkC_3 = view_i->alpha() * C3;
-    Vec3d Ck_1 = c1 - view_i->lambda() * RkC_1;
-    Vec3d Ck_2 = c2 - view_i->lambda() * RkC_2; 
-    Vec3d Ck_3 = c3 - view_i->lambda() * RkC_3; 
+    Vec3d RkC_1 = view_i->alpha0() * C1;
+    Vec3d RkC_2 = view_i->alpha0() * C2;
+    Vec3d RkC_3 = view_i->alpha0() * C3;
+    Vec3d Ck_1 = c1 - view_i->lambda()[0] * RkC_1;
+    Vec3d Ck_2 = c2 - view_i->lambda()[0] * RkC_2; 
+    Vec3d Ck_3 = c3 - view_i->lambda()[0] * RkC_3; 
 
-    view_i->beta() = (Ck_1+Ck_2+Ck_3)*NbDiv;
+    //view_i->beta() = (Ck_1+Ck_2+Ck_3)*NbDiv;
+    Vec3d beta = (Ck_1+Ck_2+Ck_3)*NbDiv;
+    view_i->beta()[0] = beta(0);
+    view_i->beta()[1] = beta(1);
+    view_i->beta()[2] = beta(2);
 
 }
 
@@ -456,9 +496,10 @@ void cTripletSet::LocalToGlobal(cNviewPoseX* pose,const int& view, Mat3d& R,Vec3
     Vec3d c;
     c << cptr[0], cptr[1], cptr[2];
 
-    Mat3d alpha = pose->alpha();
-    Vec3d beta = pose->beta();
-    double lambda = pose->lambda();
+    Mat3d alpha = pose->alpha0();
+    Vec3d beta;
+    beta << pose->beta()[0], pose->beta()[1], pose->beta()[2];
+    double lambda = pose->lambda()[0];
 
     R = alpha.inverse() * r;
     C = 1.0/lambda * alpha.inverse() * (c - beta);
@@ -470,6 +511,7 @@ void cTripletSet::SaveGlobalPoses(const std::string& filename)
 {
     std::fstream eo_file;
     eo_file.open(filename.c_str(), std::istream::out);
+    eo_file << std::fixed << std::setprecision(8) ;
 
     for (auto pose : mGlobalPoses)
     {

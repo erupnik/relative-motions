@@ -49,16 +49,49 @@ class cPoseConstraint
       const double   pose_pds;
 };
 
+/* under dev */
+class cResidualOnViewPoseAffFree
+{
+    public: 
+        cResidualOnViewPoseAffFree(const Mat3d alpha0, const Mat3d r0, const Vec3d c0, const Mat3d R0, const Mat6d covariance) :
+                                               m_alpha0(alpha0),
+                                               m_r0(r0),
+                                               m_c0(c0),
+                                               m_R0(R0),
+                                               m_cov(covariance) {}
+        ~cResidualOnViewPoseAffFree(){}
+
+
+        template <typename T>
+            bool operator()(const T* const C, const T* const W, 
+                            const T* const Walpha, const T* const beta, const T* const lambda, 
+                            T* Residual) const;
+                                
+        static CostFunction* Create(const Mat3d alpha0,
+                                    const Mat3d r0, const Vec3d c0, const Mat3d R0, const Mat6d covariance);
+
+    private:
+        const Mat3d m_alpha0;
+
+        const Mat3d m_r0;
+        const Vec3d m_c0;
+
+        const Mat3d m_R0;
+
+        const Mat6d m_cov;
+};
+
 class cResidualOnViewPose
 {
     public: 
-        cResidualOnViewPose(const Mat3d alpha, const Vec3d beta, const double lambda,
+        cResidualOnViewPose(const Mat3d alpha, const double* beta, const double* lambda,
                             const Mat3d r0, const Vec3d c0, const Mat3d R0, const Mat6d covariance) :
                                                m_alpha(alpha),
                                                m_beta(beta),
                                                m_lambda(lambda),
                                                m_r0(r0),
-                                               m_r0_inv_alpha_R0(r0.inverse() * alpha * R0),
+                                               //m_r0_inv_alpha_R0(r0.inverse() * alpha * R0),
+                                               m_alpha_R0(alpha * R0),
                                                m_c0(c0),
                                                m_R0(R0),
                                                m_cov(covariance) {}
@@ -67,16 +100,18 @@ class cResidualOnViewPose
         template <typename T>
             bool operator()(const T* const C, const T* const W, T* Residual) const;
 
-        static CostFunction* Create(const Mat3d alpha, const Vec3d beta, const double lambda,
+        static CostFunction* Create(const Mat3d alpha, const double* beta, const double* lambda,
                                     const Mat3d r0, const Vec3d c0, const Mat3d R0, const Mat6d covariance);
+        //static CostFunction* Create(const Mat3d alpha, const Vec3d beta, const double lambda,
+        //                           const Mat3d r0, const Vec3d c0, const Mat3d R0, const Mat6d covariance);
 
     private:
         const Mat3d m_alpha;
-        const Vec3d m_beta;
-        const double m_lambda;
+        const double* m_beta;
+        const double* m_lambda;
 
         const Mat3d m_r0;
-        const Mat3d m_r0_inv_alpha_R0;
+        const Mat3d m_alpha_R0;
         const Vec3d m_c0;
 
         const Mat3d m_R0;

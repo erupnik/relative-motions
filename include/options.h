@@ -58,7 +58,7 @@ struct LocalBundleOptions
       
         // maximum Hessian trace value, 
         // motions above this value are not considered
-        double _TRACE_H = 10e10;
+        double _TRACE_H = 10e15;
 
         // print covariances to a file 
         bool _WRITE_COV = false;

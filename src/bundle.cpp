@@ -5,6 +5,7 @@
 class cResidualError;//pose and 3d points as parameters
 class cResidualOnPose;//only pose as parameter
 class cResidualOnViewPose; //local to global view transformation with covariance propagation
+class cResidualOnViewPoseAffFree; //local to global view transformation with covariance propagation, affine trafo as param
 class cPoseConstraint;//constrant on pose
 
 template <typename T>
@@ -17,9 +18,9 @@ bool cResidualOnViewPose::operator()(const T* const C, const T* const W, T* Resi
     //Iw =  inv(r0) @ M @ R0 @ (I + WMat) => output is also skew
 
     //lambda * alpha * C  + beta - c = e
-    T res_cx = m_lambda * (m_alpha(0,0)*C[0] +  m_alpha(0,1)*C[1] +  m_alpha(0,2)*C[2]) + m_beta[0] - m_c0[0];
-    T res_cy = m_lambda * (m_alpha(1,0)*C[0] +  m_alpha(1,1)*C[1] +  m_alpha(1,2)*C[2]) + m_beta[1] - m_c0[1];
-    T res_cz = m_lambda * (m_alpha(2,0)*C[0] +  m_alpha(2,1)*C[1] +  m_alpha(2,2)*C[2]) + m_beta[2] - m_c0[2];
+    T res_cx = m_lambda[0] * (m_alpha(0,0)*C[0] +  m_alpha(0,1)*C[1] +  m_alpha(0,2)*C[2]) + m_beta[0] - m_c0[0];
+    T res_cy = m_lambda[0] * (m_alpha(1,0)*C[0] +  m_alpha(1,1)*C[1] +  m_alpha(1,2)*C[2]) + m_beta[1] - m_c0[1];
+    T res_cz = m_lambda[0] * (m_alpha(2,0)*C[0] +  m_alpha(2,1)*C[1] +  m_alpha(2,2)*C[2]) + m_beta[2] - m_c0[2];
     //std::cout << res_cx << " " << res_cy << " " << res_cz << "\n";
 
     // r = alpha * R , global to local
@@ -27,9 +28,14 @@ bool cResidualOnViewPose::operator()(const T* const C, const T* const W, T* Resi
     //     w+I = r0**-1 alpha * R0 * (I+W)
     //
     //w   = r0**-1 alpha * R0 * (I+W) -I => r0**-1 alpha * R0 * (I+W) -I -w = e  (here w=0) 
-    T res_wx = m_r0_inv_alpha_R0(2,0)*(-W[2]) + m_r0_inv_alpha_R0(2,1)*1 + m_r0_inv_alpha_R0(2,2)*W[0]; //wx (2,1)
-    T res_wy = m_r0_inv_alpha_R0(0,0)*W[1] + m_r0_inv_alpha_R0(0,1)*(-W[0]) + m_r0_inv_alpha_R0(0,2)*1; //wy (0,2)
-    T res_wz = m_r0_inv_alpha_R0(1,0)*1 + m_r0_inv_alpha_R0(1,1)*(W[2]) + m_r0_inv_alpha_R0(1,2)*(-W[1]); //wz (1,0)
+    //T res_wx = m_r0_inv_alpha_R0(2,0)*(-W[2]) + m_r0_inv_alpha_R0(2,1)*1 + m_r0_inv_alpha_R0(2,2)*W[0]   ; //wx (2,1)
+    //T res_wy = m_r0_inv_alpha_R0(0,0)*W[1] + m_r0_inv_alpha_R0(0,1)*(-W[0]) + m_r0_inv_alpha_R0(0,2)*1   ; //wy (0,2)
+    //T res_wz = m_r0_inv_alpha_R0(1,0)*1 + m_r0_inv_alpha_R0(1,1)*(W[2]) + m_r0_inv_alpha_R0(1,2)*(-W[1]) ; //wz (1,0)
+    
+    //e = alpha R0 (W+I) - r0 
+    T res_wx = m_alpha_R0(2,0)*(-W[2]) + m_alpha_R0(2,1)*1 + m_alpha_R0(2,2)*W[0]   - m_r0(2,1); //wx (2,1)
+    T res_wy = m_alpha_R0(0,0)*W[1] + m_alpha_R0(0,1)*(-W[0]) + m_alpha_R0(0,2)*1   - m_r0(0,2); //wy (0,2)
+    T res_wz = m_alpha_R0(1,0)*1 + m_alpha_R0(1,1)*(W[2]) + m_alpha_R0(1,2)*(-W[1]) - m_r0(1,0); //wz (1,0)
 
     //weigh by the hessian = 1/sigma 
     Residual[0] = m_cov(0,0)*res_cx + m_cov(0,1)*res_cy + m_cov(0,2)*res_cz + m_cov(0,3)*res_wx + m_cov(0,4)*res_wy + m_cov(0,5)*res_wz; 
@@ -47,10 +53,77 @@ bool cResidualOnViewPose::operator()(const T* const C, const T* const W, T* Resi
     return true;
 }
 
-CostFunction * cResidualOnViewPose::Create(const Mat3d alpha, const Vec3d beta, const double lambda,
+CostFunction * cResidualOnViewPose::Create(const Mat3d alpha, const double* beta, const double* lambda,
                                            const Mat3d r0, const Vec3d c0,const Mat3d R0, const Mat6d covariance)
 {
     return  (new AutoDiffCostFunction<cResidualOnViewPose,6,3,3> (new cResidualOnViewPose(alpha,beta,lambda,r0,c0,R0,covariance)));
+}
+
+template <typename T>
+bool cResidualOnViewPoseAffFree::operator()(const T* const C, const T* const W,
+                                            const T* const Walpha, const T* const beta, const T* const lambda, 
+                                            T* Residual) const
+{
+
+    //ec = lambda * alpha0 * (I + Walpha) * C  + beta -c 
+    //ec = lambda *          A            * C  + beta -c
+    T A00 = m_alpha0(0,0)*1.0          + m_alpha0(0,1)*Walpha[2]    + m_alpha0(0,2)*(-Walpha[1]);
+    T A01 = m_alpha0(0,0)*(-Walpha[2]) + m_alpha0(0,1)*1.0          + m_alpha0(0,2)*Walpha[0];
+    T A02 = m_alpha0(0,0)*Walpha[1]    + m_alpha0(0,1)*(-Walpha[0]) + m_alpha0(0,2)*1.0;
+    T A10 = m_alpha0(1,0)*1.0          + m_alpha0(1,1)*Walpha[2]    + m_alpha0(1,2)*(-Walpha[1]);
+    T A11 = m_alpha0(1,0)*(-Walpha[2]) + m_alpha0(1,1)*1.0          + m_alpha0(1,2)*Walpha[0];
+    T A12 = m_alpha0(1,0)*Walpha[1]    + m_alpha0(1,1)*(-Walpha[0]) + m_alpha0(1,2)*1.0;
+    T A20 = m_alpha0(2,0)*1.0          + m_alpha0(2,1)*Walpha[2]    + m_alpha0(2,2)*(-Walpha[1]);
+    T A21 = m_alpha0(2,0)*(-Walpha[2]) + m_alpha0(2,1)*1.0          + m_alpha0(2,2)*Walpha[0];
+    T A22 = m_alpha0(2,0)*Walpha[1]    + m_alpha0(2,1)*(-Walpha[0]) + m_alpha0(2,2)*1.0;
+
+    T res_cx = lambda[0]*(A00*C[0] + A01*C[1] + A02*C[2]) + beta[0] - m_c0[0];
+    T res_cy = lambda[0]*(A10*C[0] + A11*C[1] + A12*C[2]) + beta[1] - m_c0[1];
+    T res_cz = lambda[0]*(A20*C[0] + A21*C[1] + A22*C[2]) + beta[2] - m_c0[2];
+
+    //ew = alpha0 * (I + Walpha) * R0 * (I+W) - r 
+    //ew =            A          * R0 *   B   - r 
+    T AR0_00 = A00*m_R0(0,0) + A01*m_R0(1,0) + A02*m_R0(2,0);
+    T AR0_01 = A00*m_R0(0,1) + A01*m_R0(1,1) + A02*m_R0(2,1);
+    T AR0_02 = A00*m_R0(0,2) + A01*m_R0(1,2) + A02*m_R0(2,2);
+    T AR0_10 = A10*m_R0(0,0) + A11*m_R0(1,0) + A12*m_R0(2,0);
+    T AR0_11 = A10*m_R0(0,1) + A11*m_R0(1,1) + A12*m_R0(2,1);
+    T AR0_12 = A10*m_R0(0,2) + A11*m_R0(1,2) + A12*m_R0(2,2);
+    T AR0_20 = A20*m_R0(0,0) + A21*m_R0(1,0) + A22*m_R0(2,0);
+    T AR0_21 = A20*m_R0(0,1) + A21*m_R0(1,1) + A22*m_R0(2,1);
+    T AR0_22 = A20*m_R0(0,2) + A21*m_R0(1,2) + A22*m_R0(2,2);
+
+    T AR0B_r_00 =   (AR0_00*1.0     +   AR0_01*W[2]    +  AR0_02*(-W[1])) - m_r0(0,0); 
+    T AR0B_r_01 =   (AR0_00*(-W[2]) +   AR0_01*1.0     +  AR0_02*W[0])    - m_r0(0,1);
+    T AR0B_r_02 =   (AR0_00*W[1]    +   AR0_01*(-W[0]) +  AR0_02*1.0)     - m_r0(0,2);
+    T AR0B_r_10 =   (AR0_10*1.0     +   AR0_11*W[2]    +  AR0_12*(-W[1])) - m_r0(1,0);
+    T AR0B_r_11 =   (AR0_10*(-W[2]) +   AR0_11*1.0     +  AR0_12*W[0])    - m_r0(1,1);
+    T AR0B_r_12 =   (AR0_10*W[1]    +   AR0_11*(-W[0]) +  AR0_12*1.0)     - m_r0(1,2);
+    T AR0B_r_20 =   (AR0_20*1.0     +   AR0_21*W[2]    +  AR0_22*(-W[1])) - m_r0(2,0);
+    T AR0B_r_21 =   (AR0_20*(-W[2]) +   AR0_21*1.0     +  AR0_22*W[0])    - m_r0(2,1); 
+    T AR0B_r_22 =   (AR0_20*W[1]    +   AR0_21*(-W[0]) +  AR0_22*1.0)     - m_r0(2,2);
+
+    //std::cout << "ewe============ " << AR0B_r_00 << " " << AR0B_r_11 << " " << AR0B_r_20 << "\n";
+
+    T res_wx = AR0B_r_21;
+    T res_wy = AR0B_r_02;
+    T res_wz = AR0B_r_10;
+
+
+    //weigh by the hessian = 1/sigma 
+    Residual[0] = m_cov(0,0)*res_cx + m_cov(0,1)*res_cy + m_cov(0,2)*res_cz + m_cov(0,3)*res_wx + m_cov(0,4)*res_wy + m_cov(0,5)*res_wz; 
+    Residual[1] = m_cov(1,0)*res_cx + m_cov(1,1)*res_cy + m_cov(1,2)*res_cz + m_cov(1,3)*res_wx + m_cov(1,4)*res_wy + m_cov(1,5)*res_wz;
+    Residual[2] = m_cov(2,0)*res_cx + m_cov(2,1)*res_cy + m_cov(2,2)*res_cz + m_cov(2,3)*res_wx + m_cov(2,4)*res_wy + m_cov(2,5)*res_wz;
+    Residual[3] = m_cov(3,0)*res_cx + m_cov(3,1)*res_cy + m_cov(3,2)*res_cz + m_cov(3,3)*res_wx + m_cov(3,4)*res_wy + m_cov(3,5)*res_wz;
+    Residual[4] = m_cov(4,0)*res_cx + m_cov(4,1)*res_cy + m_cov(4,2)*res_cz + m_cov(4,3)*res_wx + m_cov(4,4)*res_wy + m_cov(4,5)*res_wz;
+    Residual[5] = m_cov(5,0)*res_cx + m_cov(5,1)*res_cy + m_cov(5,2)*res_cz + m_cov(5,3)*res_wx + m_cov(5,4)*res_wy + m_cov(5,5)*res_wz;
+
+    return true;
+}  
+
+CostFunction * cResidualOnViewPoseAffFree::Create(const Mat3d alpha0, const Mat3d r0, const Vec3d c0,const Mat3d R0, const Mat6d covariance)
+{
+    return  (new AutoDiffCostFunction<cResidualOnViewPoseAffFree,6,3,3,3,3,1> (new cResidualOnViewPoseAffFree(alpha0,r0,c0,R0,covariance)));
 }
 
 template <typename T>
