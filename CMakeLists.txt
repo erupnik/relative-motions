@@ -11,6 +11,12 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 find_package(Ceres REQUIRED)
 include_directories(${CERES_INCLUDE_DIRS})
 
+#find_package(CXSparse REQUIRED)
+#include_directories(${CXSparse_INCLUDE_DIRS})
+
+#find_package(SuiteSparse 4.0 COMPONENTS CHOLMOD SPQR)
+#include_directories(${SuiteSparse_INCLUDE_DIRS})
+
 find_package(Boost COMPONENTS program_options REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 

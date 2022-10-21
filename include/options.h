@@ -7,6 +7,9 @@
 struct GlobalBundleOptions
 {
     public:
+        // if true do propgation, otherwise basic adjustment
+        bool _PROPAGATE=true;
+
         // square root PDS for rotations
         double _ROT_PDS=0.01 ;
 
@@ -15,7 +18,7 @@ struct GlobalBundleOptions
 
         // huber loss threshold for similarities 
         // (in the unit of the local motion frame)
-        double _HUBER_S=0.001;
+        double _HUBER_S=0.1;
 
         // huber loss threshold for poses (soft constraint)
         // (in the units of the global poses)
@@ -23,6 +26,9 @@ struct GlobalBundleOptions
 
         //use inner iterations
         bool _INNER_ITER=false;
+
+        //number of cores 
+        int _PROC_COUNT=std::thread::hardware_concurrency();
 
     private:
 };
@@ -68,6 +74,12 @@ struct LocalBundleOptions
 
         //use inner iterations
         bool _INNER_ITER=false;
+
+        //number of cores 
+        int _PROC_COUNT=std::thread::hardware_concurrency();
+   
+        //focal in pixels 
+        double _FOCAL = 1;
 
     private:
 

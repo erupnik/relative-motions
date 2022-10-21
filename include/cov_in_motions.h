@@ -257,9 +257,7 @@ class cNviewPoseX
                      cPoseGen* v2,
                      cPoseGen* v3,
                      cHessianGradientX* aHg) :
-                            m_Walpha(new double[3]),
-                            m_beta(new double[3]),
-                            m_lambda(new double[1]),
+                            m_alpha_beta_l(new double[7]),
                             mView1(v1),
                             mView21(v2),
                             mView31(v3),
@@ -267,19 +265,20 @@ class cNviewPoseX
                             mNbV( (&(*mView31)==NULL) ? 2 : 3 ),
                             _COV_PROP(false),
                             _FLAG_OUTLIER(false),
-                            _INIT(false) {
-                                memset(m_Walpha, 0, sizeof(int)*3);
-                                memset(m_beta, 0, sizeof(int)*3);
-                                memset(m_lambda, 0, sizeof(int)*1);
-                                m_Walpha[0] = 0;
-                                m_Walpha[1] = 0;
-                                m_Walpha[2] = 0;
+                            _INIT(false),
+                            mTotalRes(0.0) {
+                                memset(m_alpha_beta_l, 0, sizeof(int)*7);
+                                m_alpha_beta_l[0] = 0;//init bc these values are not read and init with 0
+                                m_alpha_beta_l[1] = 0;
+                                m_alpha_beta_l[2] = 0;
                             }
     ~cNviewPoseX()
     {
-        delete m_Walpha;
-        delete m_beta;
-        delete m_lambda;
+        delete m_alpha_beta_l;
+        delete mView1;
+        delete mView21;
+        delete mView31;
+        delete mHg;
     }
 
     cPoseGen& View(int NbV)  {
@@ -289,39 +288,51 @@ class cNviewPoseX
     bool IS_COV_PROP() {return _COV_PROP;}
 
     cHessianGradientX& Hg_() {return *mHg;};
+
+    void               decompose_H();
+    VecXd&             Wi() {return mWi;};
+    MatXd&             Li() {return mLi;};
+    VecXd&             Cstei() {return mCstei;};
+    double&            TotalRes() {return mTotalRes;}; 
+
     int NbView() const {return mNbV;};
 
-    double* lambda() {return m_lambda;}
     Mat3d&  alpha0()  {return m_alpha0;}
-    double*  Walpha()   {return m_Walpha;}
-    double*  beta()   {return m_beta;}
+    double*  alpha_beta_l() {return m_alpha_beta_l;}
 
     void PrintAlpha() {std::cout << m_alpha0 << "\n";}
-    void PrintBeta() {std::cout << m_beta[0] << " " << m_beta[1] << " " << m_beta[2] << "\n";}
-    void PrintLambda() {std::cout << m_lambda[0] << "\n";}
+    void PrintBeta() {std::cout << m_alpha_beta_l[3] << " " << m_alpha_beta_l[4] << " " << m_alpha_beta_l[5] << "\n";}
+    void PrintLambda() {std::cout << m_alpha_beta_l[6] << "\n";}
+    void PrintTotalRes() {std::cout << mTotalRes << "\n";}
 
     bool Init() {return _INIT;}
     void SetInit() {_INIT=true;}
     void SetOutlier() {_FLAG_OUTLIER=true;}
     void Show() {mView1->Show(); mView21->Show(); if (mNbV==3) mView31->Show();}
 
+
   private:
     //sAffine         affine_trafo;
     Mat3d           m_alpha0;
-    double*         m_Walpha;
-    double*         m_beta;
-    double*         m_lambda;
+    double*         m_alpha_beta_l;
 
     cPoseGen*                            mView1; // Identity
     cPoseGen*                            mView21;
     cPoseGen*                            mView31;
+    /* Hessian and the gradiet (covariance stuff) */
     cHessianGradientX*                   mHg;
+    /* Cov decomposed to linear terms */
+    VecXd                                 mWi;//eigenvalues
+    MatXd                                 mLi;//eigenvectors
+    VecXd                                 mCstei;//constant component
 
     int                                  mNbV;
     bool                                 _COV_PROP;
 
     bool                                 _FLAG_OUTLIER;
     bool                                 _INIT;
+
+    double                               mTotalRes;
 
 };
 
@@ -339,7 +350,7 @@ class cAppCovInMotion
                     const LocalBundleOptions& ,
                     const GlobalBundleOptions& ,
                     const bool );
-    ~cAppCovInMotion();
+    ~cAppCovInMotion() ;
 
     bool ReadFeatures(std::string);
     void PrintAllPts3d();
@@ -351,12 +362,16 @@ class cAppCovInMotion
     void SetMinimizerLocal(ceres::Solver::Options&);
     void SetMinimizerGlobal(ceres::Solver::Options&);
     bool OptimizeRelMotions();
-    bool OptimizeRelMotionsGlobally();
+    //bool OptimizeRelMotionsGlobally();
+    //bool OptimizeRelMotionsGloballyWithDecomp();
+    bool OptimizeRelMotionsGloballyAllViewsWithDecomp();
     bool OptimizeGlobally();
 
     void WriteLocalCovs();
     void WriteToPLYFile(const std::string& filename,
                         const std::string& viewName);
+
+    double CostAttenuate(double Val,double ValMax) {return (Val+ValMax)/(Val*ValMax); };
 
   private:
     void MapJacToEigMat(Eigen::SparseMatrix<double>&, MatXd&, int offset);

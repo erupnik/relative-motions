@@ -182,11 +182,13 @@ bool cTripletSet::ReadSimGlobal()
         if (DicBoolFind(mAllViewMap,aViewName))
         {
             //double& L = mAllViewMap[aViewName]->lambda();
-            double* L = mAllViewMap[aViewName]->lambda();
+            //double* L = mAllViewMap[aViewName]->lambda();
             Mat3d&  alpha = mAllViewMap[aViewName]->alpha0();
-            double*  beta  = mAllViewMap[aViewName]->beta();
+            //double*  beta  = mAllViewMap[aViewName]->beta();
+            double* alpha_beta_l = mAllViewMap[aViewName]->alpha_beta_l();
 
-            if (! ReadRotTrS(fptr,alpha,beta,L))
+            //if (! ReadRotTrS(fptr,alpha,beta,L))
+            if (! ReadRotTrS(fptr,alpha,alpha_beta_l))
             {
                 std::cout << "ERROR reading global similitude in cAppCovInMotion::ReadSimGlobal for "
                           << aViewName << "\n" ;
@@ -234,6 +236,33 @@ bool cTripletSet::ReadSimGlobal()
 
     return EXIT_SUCCESS;
 }
+bool cTripletSet::ReadRotTrS(FILE* fptr,Mat3d& alpha,double*& alpha_beta_l)
+{
+    bool OK;
+    //rotation
+    for (int aK1=0; aK1<3; aK1++)
+    {
+        for (int aK2=0; aK2<3; aK2++)
+        {
+            OK = fscanf(fptr, "%lf", &alpha(aK1,aK2));
+            //std::cout << alpha(aK1,aK2) << " " << aK1 << " ";
+        }
+    }
+
+    //translation
+    for (int aK=0; aK<3; aK++)
+    {
+        OK = fscanf(fptr, "%lf", &alpha_beta_l[3+aK]);
+        //std::cout << beta(aK) << " ";
+    }
+
+    //scale
+    OK = fscanf(fptr, "%lf", &alpha_beta_l[6]);
+    //std::cout << s << " " << OK << " s";
+
+    return OK;
+}
+
 bool cTripletSet::ReadRotTrS(FILE* fptr,Mat3d& alpha,double*& beta,double*& s)
 {
     bool OK;
@@ -356,10 +385,40 @@ void cTripletSet::PrintAllPosesDelta()
 {
     std::cout << "Global poses:\n";
     for (auto pose : mGlobalPoses)
-    {
-        std::cout << pose.first << "\n";
-        pose.second->ShowImmutable();
+    {   
+        if (pose.second->IsRefined())
+        {
+            std::cout << pose.first << "\n";
+            pose.second->ShowImmutable();
+        }
     }
+}
+void cTripletSet::PrintSumDelta()
+{
+    std::cout << "Sum of corrections for dC and dOmega:\n";
+    Vec3d dCSom(0,0,0);
+    Vec3d dWSom(0,0,0);
+    int Cmpt=0;
+    for (auto pose : mGlobalPoses)
+    {   
+        if (pose.second->IsRefined())
+        {
+            dCSom[0] += abs(pose.second->C()[0] - pose.second->C_immutable()[0]);
+            dCSom[1] += abs(pose.second->C()[1] - pose.second->C_immutable()[1]);
+            dCSom[2] += abs(pose.second->C()[2] - pose.second->C_immutable()[2]);
+
+            dWSom[0] += abs(pose.second->Omega()[0] - pose.second->Omega_immutable()[0] );
+            dWSom[1] += abs(pose.second->Omega()[1] - pose.second->Omega_immutable()[1] );
+            dWSom[2] += abs(pose.second->Omega()[2] - pose.second->Omega_immutable()[2] );
+
+            Cmpt++;
+        }
+    }  
+
+    std::cout << "Som dC=" << dCSom[0] << " " << dCSom[1] << " " << dCSom[2] << 
+                 ", Mean=" << dCSom[0]/Cmpt << " " <<  dCSom[1]/Cmpt << " " <<  dCSom[2]/Cmpt << "\n";
+    std::cout << "Som dW=" << dWSom[0] << " " << dWSom[1] << " " << dWSom[2]  << 
+                 ", Mean=" << dWSom[0]/Cmpt << " " << dWSom[1]/Cmpt << " " << dWSom[2]/Cmpt << "\n";
 }
 
 void cTripletSet::PrintAllPoses()
@@ -459,7 +518,7 @@ void cTripletSet::AffineFromLocGlob(cNviewPoseX* view_i)
     //lambda 
     double L1 = euclid(c1 - c2) / euclid(C1 - C2);
     double L2 = euclid(c1 - c3) / euclid(C1 - C3);
-    view_i->lambda()[0] = (L1 + L2) / ((TVIEW) ? 2 : 1);
+    view_i->alpha_beta_l()[6] = (L1 + L2) / ((TVIEW) ? 2 : 1);
 
     //rotation  Rk = rk_i * Ri^-1
     Mat3d Rk_i = view_i->View(0).R() * Pose1->R().transpose();
@@ -475,15 +534,15 @@ void cTripletSet::AffineFromLocGlob(cNviewPoseX* view_i)
     Vec3d RkC_1 = view_i->alpha0() * C1;
     Vec3d RkC_2 = view_i->alpha0() * C2;
     Vec3d RkC_3 = view_i->alpha0() * C3;
-    Vec3d Ck_1 = c1 - view_i->lambda()[0] * RkC_1;
-    Vec3d Ck_2 = c2 - view_i->lambda()[0] * RkC_2; 
-    Vec3d Ck_3 = c3 - view_i->lambda()[0] * RkC_3; 
+    Vec3d Ck_1 = c1 - view_i->alpha_beta_l()[6] * RkC_1;
+    Vec3d Ck_2 = c2 - view_i->alpha_beta_l()[6] * RkC_2; 
+    Vec3d Ck_3 = c3 - view_i->alpha_beta_l()[6] * RkC_3; 
 
     //view_i->beta() = (Ck_1+Ck_2+Ck_3)*NbDiv;
     Vec3d beta = (Ck_1+Ck_2+Ck_3)*NbDiv;
-    view_i->beta()[0] = beta(0);
-    view_i->beta()[1] = beta(1);
-    view_i->beta()[2] = beta(2);
+    view_i->alpha_beta_l()[3] = beta(0);
+    view_i->alpha_beta_l()[4] = beta(1);
+    view_i->alpha_beta_l()[5] = beta(2);
 
 }
 
@@ -498,8 +557,8 @@ void cTripletSet::LocalToGlobal(cNviewPoseX* pose,const int& view, Mat3d& R,Vec3
 
     Mat3d alpha = pose->alpha0();
     Vec3d beta;
-    beta << pose->beta()[0], pose->beta()[1], pose->beta()[2];
-    double lambda = pose->lambda()[0];
+    beta << pose->alpha_beta_l()[3], pose->alpha_beta_l()[4], pose->alpha_beta_l()[5];
+    double lambda = pose->alpha_beta_l()[6];
 
     R = alpha.inverse() * r;
     C = 1.0/lambda * alpha.inverse() * (c - beta);
@@ -519,13 +578,13 @@ void cTripletSet::SaveGlobalPoses(const std::string& filename)
         {
             cPose * pose0 = mGlobalPoses[pose.first];
             
-            Mat3d dW;
-            dW << 1,                 -pose0->Omega()[2], pose0->Omega()[1],
+            Mat3d dWI;
+            dWI << 1,                 -pose0->Omega()[2], pose0->Omega()[1],
                   pose0->Omega()[2],    1,              -pose0->Omega()[0],
                  -pose0->Omega()[1], pose0->Omega()[0],             1;
          
          
-            Mat3d newR = pose0->R()*dW;
+            Mat3d newR = pose0->R()*dWI;
             //pose0->Show();
          
             eo_file << pose.first << " " << newR(0,0) << " " << newR(0,1) << " " << newR(0,2)
@@ -534,6 +593,21 @@ void cTripletSet::SaveGlobalPoses(const std::string& filename)
                                   << " " << pose0->C()[0]
                                   << " " << pose0->C()[1]
                                   << " " << pose0->C()[2] << "\n";
+            /*eo_file << pose.first << " " << pose0->R()(0,0) << " " << pose0->R()(0,1) << " " << pose0->R()(0,2)
+                                  << " " << pose0->R()(1,0) << " " << pose0->R()(1,1) << " " << pose0->R()(1,2)
+                                  << " " << pose0->R()(2,0) << " " << pose0->R()(2,1) << " " << pose0->R()(2,2)
+                                  << " " << pose0->C()[0]
+                                  << " " << pose0->C()[1]
+                                  << " " << pose0->C()[2] << "\n";*/
+           
+
+            /*eo_file << pose.first << " " << pose0->R()(0,0) << " " << pose0->R()(0,1) << " " << pose0->R()(0,2)
+                                  << " " << pose0->R()(1,0) << " " << pose0->R()(1,1) << " " << pose0->R()(1,2)
+                                  << " " << pose0->R()(2,0) << " " << pose0->R()(2,1) << " " << pose0->R()(2,2)
+                                  << " " << pose0->C_immutable()[0]
+                                  << " " << pose0->C_immutable()[1]
+                                  << " " << pose0->C_immutable()[2] << "\n";*/ 
+
         }
     }
     eo_file.close();

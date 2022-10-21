@@ -40,16 +40,20 @@ int main(int argc,char** argv)
             ("global_poses_out", po::value<std::string>(), "input files: output, refined global poses")
 
             ("lba_run_prop", po::value<bool>(), "local BA: covariance propagation ON/OFF")
+            ("lba_focal", po::value<double>(), "local BA: focal length")
             ("lba_feat_pds", po::value<double>(), "local BA: norm feature PDS")
             ("lba_R_pds", po::value<double>(), "local BA: rotation PDS")
             ("lba_C_pds", po::value<double>(), "local BA: center PDS")
             ("lba_loss_fea", po::value<double>(), "local BA: Huber loss threshold for features")
             ("lba_write_cov", po::value<bool>(), "local BA: covariance propagation ON/OFF")
+            ("lba_nb_proc", po::value<int>(), "local BA: number of cores")
             ("gba_R_pds", po::value<double>(), "global BA: rotation PDS")
             ("gba_C_pds", po::value<double>(), "global BA: center PDS")
             ("gba_loss_sim", po::value<double>(), "global BA: Huber loss threshold for similarities")
             ("gba_loss_gp", po::value<double>(), "global BA: Huber loss threshold for global poses")
             ("gba_inner_iter", po::value<bool>(), "global BA: Use inner iterations")
+            ("gba_propagate", po::value<bool>(), "global BA: propagate covariance, def=true")
+            ("gba_nb_proc", po::value<int>(), "global BA: number of cores")
             
             ("ceres_cov", po::value<bool>(), "internal: compute ceres covariance")
 ;
@@ -135,6 +139,13 @@ int main(int argc,char** argv)
             lba_opts._KEY += std::to_string(random);
 
         }
+        
+        if (vmap.count("lba_nb_proc")) 
+            lba_opts._PROC_COUNT = vmap["lba_nb_proc"].as<int>() ;
+
+        if (vmap.count("lba_focal")) 
+            lba_opts._FOCAL = vmap["lba_focal"].as<double>() ;
+
 
         //global bundle adjustemnt options
         if (vmap.count("gba_R_pds")) 
@@ -152,6 +163,11 @@ int main(int argc,char** argv)
         if (vmap.count("gba_inner_iter")) 
             gba_opts._INNER_ITER = vmap["gba_inner_iter"].as<bool>() ;
 
+        if (vmap.count("gba_propagate")) 
+            gba_opts._PROPAGATE = vmap["gba_propagate"].as<bool>() ;
+
+        if (vmap.count("gba_nb_proc")) 
+            gba_opts._PROC_COUNT = vmap["gba_nb_proc"].as<int>() ;
 
 
         // run main program 

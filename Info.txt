@@ -1,9 +1,34 @@
 TODO:
-- make sure you're using the same calibrations
-- LOSS: 
-    analyse residuals pure and after cov weighting
-    analyse the COV values 
-    analyse the observation error distribution to adapt loss params
-- CMP:  
-    see what happens if COVs are identity
-    compare with campari/BA
+- filter 2-view and 3-view based on residual 
+- add noise to poses
+- compare with 5-pts on noised poses 
+
+export edges    in: martini pairs                    out: edges  
+compute simil   in: martini pairs+martini solution   out: simil 
+predict global  in: simil+edges                      out: global
+
+r21 = (R2 * R1^-1)^-1
+R1^-1 => -R1^-1*C1,  R1^-1
+c = C2 + R2* (-R1^-1*C1)
+r = R2*R1^-1 
+
+
+
+NOTES
+- small bundle:
+  * the small rotation is applied through W^T because p = R^t (P-C) AND R^t = (R0 (I + W))^t = (I + W)^t R0^t 
+     P =  P0 + W^T ^ P0
+- Vector B in propagation set to NULL
+
+
+
+
+
+==== 2d net in mmv2
++ PropagCov: does propagation of one element to global net, 
+  * run from within the big net (SolveByCovPropagation in Exe) but the method is in elementary net (PropagCov)
+
+- create big net and initiatlise
+- propagate
+- DoOneIter -> this is only to get the reference result
+

@@ -189,7 +189,7 @@ void cPose::ShowImmutable() const
         std::cout << "\t" << mOmega_immutable[aK1] << " ";
     }
   
-    std::cout << "C \t" << mC_immutable[0] << " " << mC_immutable[1] << " " << mC_immutable[2] << "\n";
+    std::cout << "\nC \t" << mC_immutable[0] << " " << mC_immutable[1] << " " << mC_immutable[2] << "\n";
 
     std::cout << "Delta Omega / delta C\n";
     for (int aK1=0; aK1<3; aK1++)
@@ -254,6 +254,105 @@ void cPoseBasic::Show() const
 }
 
 /*********** VIEWS  *******************/
+void cNviewPoseX::decompose_H()
+{
+    /* Get covariance matrix A and vector B */
+    MatXd H = mHg->H_();
+    VecXd g = mHg->g_();
+
+    /* Get X0 = {c1x,c1y,c1z,w1x,w1y,w1z,
+     *           c2x,c2y,c2z,w2x,w2y,w2z,
+     *(optional) c3x,c3y,c3z,w3x,w3y,w3z} */ 
+    int sz = g.size();
+
+    VecXd X0 = VecXd::Zero(sz); 
+
+    for (int v=0; v<mNbV; v++)
+    {
+        X0[v*6] = this->View(v).C()[0]; 
+        X0[v*6+1] = this->View(v).C()[1];
+        X0[v*6+2] = this->View(v).C()[2];
+        X0[v*6+3] = this->View(v).Omega()[0]; 
+        X0[v*6+4] = this->View(v).Omega()[1];
+        X0[v*6+5] = this->View(v).Omega()[2];
+    }
+    //std::cout << "X0\n" << X0 << "\n";
+    /* Retrieve residual vector */
+    VecXd res_vec = g + H * X0;
+
+    /* Solve again for X0 */
+    VecXd Sol = H.ldlt().solve(res_vec); 
+    //std::cout << "Sol\n" << Sol << "\n";
+
+    /* Compute eigenvectors and eigenvalues */
+    int NbEl = 6*mNbV;
+    mWi = VecXd::Zero(NbEl);
+    mLi = MatXd::Zero(NbEl,NbEl);
+    mCstei = VecXd::Zero(NbEl);
+
+    //for (int v=0; v<mNbV; v++)
+    //{
+
+        /*Eigen::EigenSolver<MatXd> es(H.block(6*v,6*v,6,6), true);
+
+        MatXd EV = es.eigenvectors().real().transpose();
+ 
+        mLi.block(6*v,6*v,6,6)  = EV;
+        mCstei.block(6*v,0,6,1)       = EV * Sol.block(6*v,0,6,1);
+        mWi.block(6*v,0,6,1)          = es.eigenvalues().real();
+
+*/
+        /*for (int unk=0 ; unk<2; unk++)
+        {
+            Eigen::EigenSolver<MatXd> es(H.block(6*v+3*unk,6*v+3*unk,3,3), true);
+
+            MatXd EV = es.eigenvectors().real().transpose();
+ 
+            mLi.block(6*v+3*unk,6*v+3*unk,3,3)  = EV;
+            mCstei.block(6*v+3*unk,0,3,1)       = EV * Sol.block(6*v+3*unk,0,3,1);
+            mWi.block(6*v+3*unk,0,3,1)          = es.eigenvalues().real();
+
+        }*/
+        
+
+    //}
+
+/*    Eigen::EigenSolver<MatXd> es(H, true);
+
+    //MatXd EV = es.eigenvectors().transpose();
+    MatXd EV = es.eigenvectors().real().transpose();
+ 
+    mLi     = EV;
+    mCstei  = EV * Sol;
+    mWi     = es.eigenvalues().real();
+   */ 
+
+
+   Eigen::SelfAdjointEigenSolver<MatXd> es;
+   es.compute(H);
+
+   mLi = es.eigenvectors().transpose() ;
+   mWi = es.eigenvalues();
+   mCstei = mLi * Sol;
+/*
+SelfAdjointEigenSolver<Matrix4f> es;
+Matrix4f X = Matrix4f::Random(4,4);
+Matrix4f A = X + X.transpose();
+es.compute(A);
+cout << "The eigenvalues of A are: " << es.eigenvalues().transpose() << endl;
+es.compute(A + Matrix4f::Identity(4,4)); // re-use es to compute eigenvalues of A+I
+cout << "The eigenvalues of A+I are: " << es.eigenvalues().transpose() << endl;
+*/
+
+
+/*   std::cout << "mH\n" <<  H << "\n";
+    std::cout << "mLi\n" <<  mLi << "\n";
+    std::cout << "mW\n" << mWi  << "\n";
+    std::cout << "Cstei\n" <<  mCstei << "\n";
+getchar();*/ 
+   
+}
+
 /*template <typename T, typename U>
 bool cNviewPoseT<T,U>::propagate_cov()
 {
@@ -520,231 +619,297 @@ void cAppCovInMotion::WriteLocalCovs()
 
 bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
 {
-  /*bool gauge_first_cam_fix = false;
-  bool gauge_base_fix = false;
-  bool gauge_rappel_poses = true;*/
+   
 
-  // save initial structure
-  //std::string aIniStruc = views_name + "_init.ply";
-  //WriteToPLYFile(aIniStruc, views_name);
 
-  //create ceres problem
-  ceres::Problem * aProblem = new ceres::Problem;;
-  ceres::Solver::Summary        aSummary;
-
-  //covariance
-  Covariance::Options aCovOpts;
-  //aCovOpts.null_space_rank = 10;
-  //aCovOpts.algorithm_type = DENSE_SVD;
-  //aCovOpts.min_reciprocal_condition_number = 1.95146e-300;
-  Covariance covariance(aCovOpts);
-  std::vector<std::pair<const double*, const double*> > aCovBlocks;
-
-  // get features
-  std::vector<std::vector<Vec2d>>* aFeat2d = mFeatViewMap[views_name];
-
-  int aNbPts = 0;
-  if (aFeat2d)
-    aNbPts = aFeat2d->size();
-  else
-  {
-    VLOG(1) << "====>" << aNbPts << " features for " << views_name << "\n";
-    return false;
-  }
-
-  // get points 3D
-  std::vector<double*>* aFeat3d = mFeat3dMap[views_name];
-  if (int(aFeat3d->size()) != aNbPts )
-  {
-      std::cout << "Inconsistency in image observations and 3D points. int(aPtVec->size()) != aNbPts";
+    // save initial structure
+    //std::string aIniStruc = views_name + "_init.ply";
+    //WriteToPLYFile(aIniStruc, views_name);
+ 
+    //create ceres problem
+    ceres::Problem * aProblem = new ceres::Problem;;
+    ceres::Solver::Summary        aSummary;
+ 
+    //covariance
+    Covariance::Options aCovOpts;
+    //aCovOpts.null_space_rank = -1;
+    //aCovOpts.algorithm_type = DENSE_SVD;
+    //aCovOpts.min_reciprocal_condition_number = 1.95146e-300;
+    Covariance covariance(aCovOpts);
+    std::vector<std::pair<const double*, const double*> > aCovBlocks;
+ 
+    // get features
+    std::vector<std::vector<Vec2d>>* aFeat2d = mFeatViewMap[views_name];
+ 
+    int aNbPts = 0;
+    if (aFeat2d)
+      aNbPts = aFeat2d->size();
+    else
+    {
+      VLOG(1) << "====>" << aNbPts << " features for " << views_name << "\n";
       return false;
-  }
+    }
+ 
+    std::cout << views_name << " " << aNbPts << "\n";
+ 
+    // get points 3D
+    std::vector<double*>* aFeat3d = mFeat3dMap[views_name];
+    if (int(aFeat3d->size()) != aNbPts )
+    {
+        std::cout << "Inconsistency in image observations and 3D points. int(aPtVec->size()) != aNbPts";
+        return false;
+    }
+ 
+    //create cost function per observation and AddResidualBlock
+    std::vector<double*> param_bloc_CRP;
+    //std::vector<double*> param_bloc_PT3D;
+    //std::vector<ceres::ResidualBlockId> res_bloc_id;
+ 
+    int NbCam = (&(views->View(2))==NULL) ? 2 : 3;
+    for (int aCam=0; aCam<NbCam; aCam++)
+    {
+        double*  aC = views->View(aCam).C();
+        double*  aW = views->View(aCam).Omega();
+        
+        //keep reference to parameters to later retrieve their H,g
+        param_bloc_CRP.push_back(aC);
+        param_bloc_CRP.push_back(aW);
+    }
+ 
+    for (int aCam=0; aCam<NbCam; aCam++)
+    {
+        //get EO
+        double*  aC = views->View(aCam).C();
+ 
+        Mat3d   aR0 = views->View(aCam).R();
+        double*  aW = views->View(aCam).Omega();
+ 
+        double PdsAtten = CostAttenuate(aNbPts,10);
 
-  //create cost function per observation and AddResidualBlock
-  std::vector<double*> param_bloc_CR;
-
-  int NbCam = (&(views->View(2))==NULL) ? 2 : 3;
-  for (int aCam=0; aCam<NbCam; aCam++)
-  {
-      //get EO
-      double*  aC = views->View(aCam).C();
-
-      Mat3d   aR0 = views->View(aCam).R();
-      double*  aW = views->View(aCam).Omega();
-
-      //residuals on features
-      //std::cout << "features nb=" << aNbPts << "\n";
-      for (int aK=0; aK<aNbPts; aK++)
-      {
-          //residuals on features
-          if (1)
-          {
-              CostFunction * aCostF = cResidualError::Create( aR0,
-                                                              aFeat2d->at(aK).at(aCam),
-                                                              m_lba_opts._FEAT_PDS);
-              LossFunction * aLossF = new HuberLoss(m_lba_opts._HUBER);
-              aProblem->AddResidualBlock(aCostF,NULL,
-                                         aW, aC, aFeat3d->at(aK));
-          }
-          else
-          {
-              CostFunction * aCostF = cResidualOnPose::Create( aR0,
-                                                               aFeat2d->at(aK).at(aCam),
-                                                               aFeat3d->at(aK),
-                                                               m_lba_opts._FEAT_PDS);
-              LossFunction * aLossF = new HuberLoss(m_lba_opts._HUBER);
-              aProblem->AddResidualBlock(aCostF,aLossF,
-                                         aW, aC);
-          }
-      }
-
-      // ===== BEGIN FIX GAUGE TO AVOID RANK DEFICIENCY
-      //lock the first camera pose
-      if (_GAUGE_FIRST_CAM_FIX)
-      {
-        if (aCam==0)
+        //residuals on features
+        std::cout << "features nb=" << aNbPts << " " << PdsAtten << "\n";
+        for (int aK=0; aK<aNbPts; aK++)
         {
-          //perspective center
-          aProblem->SetParameterBlockConstant(aC);
-          //rotation
-          aProblem->SetParameterBlockConstant(aW);
-
-          //std::cout << "_GAUGE_FIRST_CAM_FIX" << "\n";
-        }
-      }
-      //lock the base_x of the second camera
-      if (_GAUGE_BASE_FIX)
-      {
-        if (aCam==1)
+            //residuals on features
+            if (1)
+            {
+                //compute the residual first 
+                cResidualError eval    (aR0,
+                                        aFeat2d->at(aK).at(aCam),
+                                        1.0,
+                                        m_lba_opts._FOCAL);
+                double res_non_pond =0;
+                eval(aW, aC, aFeat3d->at(aK),&res_non_pond);
+                if (res_non_pond*m_lba_opts._FOCAL <3)
+                {
+                    //std::cout << "==>" << res_non_pond*5560 << " " ;
+                 
+                    CostFunction * aCostF = cResidualError::Create( aR0,
+                                                                    aFeat2d->at(aK).at(aCam),
+                                                                    PdsAtten,
+                                                                    //m_lba_opts._FEAT_PDS,
+                                                                    1.0);
+                    LossFunction * aLossF = new HuberLoss(m_lba_opts._HUBER);
+                    aProblem->AddResidualBlock(aCostF,aLossF,
+                                               aW, aC, aFeat3d->at(aK));
+                    
+                }
+                //res_bloc_id.push_back(res_PC_id);
+                //if (aCam==0) //add the 3D points only once
+                //  param_bloc_CRP.push_back(aFeat3d->at(aK));
+            }
+            
+            
+        }  
+ 
+        // "rappel" on the poses
+        if (_GAUGE_RAPPEL_POSES)
         {
-	    ceres::SubsetManifold* constant_base_manifold = nullptr;
-            std::vector<int> constant_translation;
-            constant_translation.push_back(0);//x component
-	    
-	    constant_base_manifold = new
-		    ceres::SubsetManifold(3, constant_translation);
           
-	    aProblem->SetManifold(aC, constant_base_manifold);
-            //std::cout << "_GAUGE_BASE_FIX" << "\n";
-
-        }
-      }
-      // ===== END FIX GAUGE
-
-
-      // "rappel" on the poses
-      if (_GAUGE_RAPPEL_POSES)
-      {
-        if (_GAUGE_FIRST_CAM_FIX && aCam==0)
-        {
-            std::cout << "rappel pose cam0?\n" ;
-            getchar();
-
-        } // do nothing
-        else
-        {
-
             //perspective center
             double*  aC_immu = views->View(aCam).C_immutable();
             CostFunction * aCostC = cPoseConstraint::Create(aC_immu,m_lba_opts._C_PDS);
             aProblem->AddResidualBlock(aCostC,NULL,(aC));
-            param_bloc_CR.push_back(aC);
-
+            //param_bloc_CR.push_back(aC);
+            
             //small rotation
             double*  aW_immu = views->View(aCam).Omega_immutable();
             CostFunction * aCostR = cPoseConstraint::Create(aW_immu,m_lba_opts._ROT_PDS);
             aProblem->AddResidualBlock(aCostR,NULL,(aW));
-            param_bloc_CR.push_back(aW);
-
-            if (GET_COVARIANCES)
-            {
-                aCovBlocks.push_back(std::make_pair(aC,aC));
-                aCovBlocks.push_back(std::make_pair(aW,aW));
-
-            }
-            //std::cout << "_GAUGE_RAPPEL_POSES" << "\n";
+            //param_bloc_CR.push_back(aW);
+           
         }
-      }
+ 
+    }
 
-  }
+
+    // define between which parameters the covs should be computed 
+    for (int aCam0=0; aCam0<NbCam; aCam0++)
+    {
+        //get EO
+        double*  aC0 = views->View(aCam0).C();
+        double*  aW0 = views->View(aCam0).Omega();
+        
+        for (int aCam1=0; aCam1<NbCam; aCam1++)
+        {
+            //std::cout << aCam0 << " " <<  aCam1 << "\n";
+            //get EO
+            double*  aC1 = views->View(aCam1).C();
+            double*  aW1 = views->View(aCam1).Omega();
+
+            aCovBlocks.push_back(std::make_pair(aC0,aC1));
+            aCovBlocks.push_back(std::make_pair(aC0,aW1));
+            aCovBlocks.push_back(std::make_pair(aW0,aW1));
+            aCovBlocks.push_back(std::make_pair(aW0,aC1));
+        }
+    }
+
 
     //solve the least squares problem
-    //ceres::Solver::Options aOpts;
-    //SetCeresOptions(aOpts);
+    ceres::Solver::Options aOpts;
+    SetMinimizerLocal(aOpts);
+    
+    // Set ordering (necessary for Schur)
+    ceres::ParameterBlockOrdering* ordering =
+    new ceres::ParameterBlockOrdering;
+    // The points come before the cameras.
+    for (int aK=0; aK<aNbPts; aK++)
+    {
+        ordering->AddElementToGroup(aFeat3d->at(aK), 0);
+    }
+    for (int aCam=0; aCam<NbCam; aCam++)
+    {
+        ordering->AddElementToGroup(views->View(aCam).C(), 1);
+        ordering->AddElementToGroup(views->View(aCam).Omega(), 1);
+        
+    }
+    aOpts.linear_solver_ordering.reset(ordering);
 
-    //ceres::Solve(aOpts,aProblem,&aSummary);
+
+    ceres::Solve(aOpts,aProblem,&aSummary);
     //std::cout << aSummary.FullReport() << "\n";
-
+    
     // show first camera
     //views->View(0).Show();
 
     //get covariances
-    if (GET_COVARIANCES)
-    {
-      CHECK(covariance.Compute(aCovBlocks, aProblem));
-      for (int aCam=1; aCam<NbCam; aCam++)
-      {
-          covariance.GetCovarianceBlock(views->View(aCam).C(), views->View(aCam).C(), views->View(aCam).Cov_C());
-          covariance.GetCovarianceBlock(views->View(aCam).Omega(),views->View(aCam).Omega(), views->View(aCam).Cov_Omega());
+    MatXd CovMat = MatXd::Zero(NbCam*6,NbCam*6);
+    MatXd HMat = MatXd::Zero(NbCam*6,NbCam*6);
 
-          // show nth camera
-          //views->View(aCam).Show();
-      }
+
+    int NbVar = std::pow(NbCam,2); // =4 for NbCam=2 and 9 for NbCam=3
+    double cov_c[NbVar][18]; //18: 3x3 for Cov(Ci,Cj) and 3x3 for Cov(Ci,Wj)
+    double cov_w[NbVar][18];
+    
+
+    //if rank deficiency in jacobian, ignore this view 
+    bool RANK_OK = covariance.Compute(aCovBlocks, aProblem);
+
+
+    if (!RANK_OK)
+    {
+        VLOG(1) << "====> RANK DEFICIT IN JACOBIAN IN " << views_name << "\n";
+        return false;
+    }
+    else //- retrieve the covariances &  fill the CovMat matrix
+    {
+        for (int aCam0=0; aCam0<NbCam; aCam0++)
+        {
+            for (int aCam1=0; aCam1<NbCam; aCam1++)
+            {
+             
+                  covariance.GetCovarianceBlock(views->View(aCam0).C(), views->View(aCam1).C(),     &cov_c[aCam0*NbCam+aCam1][0]);
+                  covariance.GetCovarianceBlock(views->View(aCam0).C(), views->View(aCam1).Omega(), &cov_c[aCam0*NbCam+aCam1][9]);
+                  
+                  covariance.GetCovarianceBlock(views->View(aCam0).Omega(),views->View(aCam1).Omega(), &cov_w[aCam0*NbCam+aCam1][0]);
+                  covariance.GetCovarianceBlock(views->View(aCam0).Omega(),views->View(aCam1).C(),     &cov_w[aCam0*NbCam+aCam1][9]);
+            }
+        }
+        
+        for (int aCam0=0; aCam0<NbCam; aCam0++)
+        {
+            for (int aCam1=0; aCam1<NbCam; aCam1++)
+            {
+     
+                //c-c 
+                int cmpt=0;
+                for (int i=0; i<3; i++)
+                   for (int j=0; j<3; j++)
+                   { 
+                       CovMat(6*aCam0+i,6*aCam1+j) = cov_c[aCam0*NbCam+aCam1][cmpt];
+                       cmpt++;
+                    }
+                //cw 
+                for (int i=0; i<3; i++)
+                   for (int j=0; j<3; j++)
+                   {
+                       CovMat(6*aCam0+i,6*aCam1+3+j) = cov_c[aCam0*NbCam+aCam1][cmpt];
+                       cmpt++;
+                    }
+                //ww
+                cmpt=0;
+                for (int i=0; i<3; i++)
+                   for (int j=0; j<3; j++)
+                   {
+                       CovMat(3+6*aCam0+i,3+6*aCam1+j) = cov_w[aCam0*NbCam+aCam1][cmpt];
+                       cmpt++;
+                    }
+                //wc 
+                for (int i=0; i<3; i++)
+                   for (int j=0; j<3; j++)
+                   {
+                       CovMat(3+6*aCam0+i,3+6*aCam1-3+j) = cov_w[aCam0*NbCam+aCam1][cmpt];
+                       cmpt++;
+                    }
+            }
+        }
     }
 
-    //get the jacobians
-    double cost=0;// = aSummary.final_cost;//
+    // - compute the hessian HMat = CovMat^-1
+    Eigen::ConjugateGradient<MatXd > solver;
+    solver.compute(CovMat);
+    Eigen::SparseMatrix<double> I(NbCam*6,NbCam*6);
+    I.setIdentity();
+    Eigen::SparseMatrix<double> CovMat_inv = solver.solve(I);
+    MapJacToEigMat(CovMat_inv,HMat,0);
+
+
+    //get the residuals (vector B) 
+    double cost=aSummary.final_cost;//
     Problem::EvaluateOptions aEvalOpts;
     aEvalOpts.apply_loss_function = true;
 
-    aEvalOpts.parameter_blocks = param_bloc_CR;
+    aEvalOpts.parameter_blocks = param_bloc_CRP;
     std::vector<double> res;
-    std::vector<double> JtWres;
-    CRSMatrix *aJ = new CRSMatrix;
+    //std::vector<double> JtWres;
+    //CRSMatrix *aJ = new CRSMatrix;
 
-    bool eval_success = aProblem->Evaluate(aEvalOpts, &cost, &res, &JtWres, aJ);
-
-
-    //hessian and gradient vector
-
-    Eigen::SparseMatrix<double> A = MapJacToSparseM(aJ);
-    Eigen::SparseMatrix<double> JtWJ = (A.transpose()*A);
-    //std::cout << "Jacobian:\n" << A << "\n";
-
-    //map to MatXd
-    int JtWJ__size = _GAUGE_FIRST_CAM_FIX ? 6*(views->NbView()-1) : 6*views->NbView();
-    //std::cout << "JtWJ__size " << JtWJ__size << " JtWJ " << JtWJ.rows() << " " <<  JtWJ.cols() << "\n";
-    MatXd JtWJ_ = MatXd::Zero(JtWJ__size,JtWJ__size);
-
-    MapJacToEigMat(JtWJ,JtWJ_,((_GAUGE_BASE_FIX) ? 1 : 0));//offset 1 bc tx is the constant base
-
-    // return if trace is over the threshold
-    if (JtWJ_.trace() > m_lba_opts._TRACE_H)
+    bool eval_success = aProblem->Evaluate(aEvalOpts, &cost, &res, NULL, NULL);
+    double res_total=0.0;
+    for (auto r : res)
     {
-        std::vector<std::string> vname_decom = mTriSet->DecompViewNames(views_name);
-
-        std::cout << " -Too large value of Hessian trace for ";
-        for (auto i_n : vname_decom)
-            std::cout << i_n << " ";  
-
-        std::cout << "(" << JtWJ_.trace() <<  ")\n";
-        
-        return false;
-
+        res_total+=std::abs(r);
+        //std::cout << "res=" << r << "\n";
     }
 
-    if (_GAUGE_BASE_FIX)
-    {
-      double grad_x_const [] = {0};
-      JtWres.insert(JtWres.begin(),grad_x_const,grad_x_const+1);
-    }
 
-    Eigen::VectorXd my_vect = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(JtWres.data(), JtWres.size());//fixed-size to dynamic
-   
+    //add 1 to avois div by 0
+    res_total += 1.0;
+    std::cout << "\ntotal res=" << res_total << "\n";
+    //res_total *= m_lba_opts._FOCAL; 
 
-    //take square root of the hessian 
-    views->Hg_() = *(new cHessianGradientX(JtWJ_.sqrt(),my_vect));
-    //views->Hg_() = *(new cHessianGradientX(JtWJ_,my_vect));
+    views->TotalRes() =  1.0;//aNbPts/res_total; //res_total/aNbPts res 0.69
+
+
+    //Eigen::VectorXd my_vect = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(JtWres.data(), JtWres.size());//fixed-size to dynamic
+    //Eigen::VectorXd my_vect_poses = my_vect.block(0,0,6*views->NbView(),1);
+    VecXd my_vect_poses = VecXd::Zero(6*views->NbView());
+
+    //store  hessian and vector B 
+    views->Hg_() = *(new cHessianGradientX(HMat,my_vect_poses));
+
+    //decompose the quadratic form into a sum of linear terms 
+    views->decompose_H();
 
     bool checkRank = false;
     if (checkRank)
@@ -761,23 +926,13 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
         VLOG(2) << "Bundle adjustment SUCCESS: " << eval_success;
         VLOG(2) << "\n" << views_name
                 << " _GAUGE_BASE_FIX=" << _GAUGE_BASE_FIX << ", "
-                << " _GAUGE_FIRST_CAM_FIX=" <<  _GAUGE_FIRST_CAM_FIX << " "
-                << "\nHHHHHHHHHHHHHHHHHHHHHHHh\n" << JtWJ_.sqrt();
-        //views->Hg_().printH();
-        //VLOG(2) << "\nggggggggggggggggggggggggggggg\n" << my_vect;
-        //views->Hg_().printG();
-
-        if (!eval_success)
-            getchar();
+                << " _GAUGE_FIRST_CAM_FIX=" <<  _GAUGE_FIRST_CAM_FIX << " ";
+             //   << "\nHHHHHHHHHHHHHHHHHHHHHHHh\n" << JtWJ_.sqrt();
+       
     }
     //print residuals vector
     if (0)
     {
-        //double* cmut = views->View(1).C();
-        //double* cimmut = views->View(1).C_immutable();
-        //VLOG(2) << "C =" << cmut[0] << " " << cmut[1] << " " << cmut[2] << 
-        //           ", imm=" << cimmut[0] << " " << cimmut[1] << " " << cimmut[2] << "\n";
-        
         VLOG(2) << "residuals vector \n";
         for (int i=0; i<res.size(); i++)
         {
@@ -785,20 +940,15 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
         }
         VLOG(2) << "\n";
     }
-    //covariance check
-    if (GET_COVARIANCES)
-    {
-      Eigen::ConjugateGradient<Eigen::SparseMatrix<double> > solver;
-      solver.compute(JtWJ);
-      Eigen::SparseMatrix<double> I(aJ->num_cols,aJ->num_cols);
-      I.setIdentity();
-      Eigen::SparseMatrix<double> JtWJ_inv = solver.solve(I);
+    
 
+    if (0)
+    {
       //save covariance diagonal
-      std::string covR_file_name = "covR" + m_lba_opts._KEY + ".txt";
+      std::string covR_file_name = "covRsqrt" + m_lba_opts._KEY + ".txt";
       std::fstream covR_file;
       covR_file.open(covR_file_name.c_str(), std::ios_base::app);
-      std::string covC_file_name = "covC" + m_lba_opts._KEY + ".txt";
+      std::string covC_file_name = "covCsqrt" + m_lba_opts._KEY + ".txt";
       std::fstream covC_file;
       covC_file.open(covC_file_name.c_str(), std::ios_base::app);
 
@@ -813,25 +963,7 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
       }
 
       VLOG(2) << views_name << " ";
-      MatXd JtWJ_sqrt = JtWJ_.sqrt();
-      for (int aK1=0; aK1<JtWJ_sqrt.rows(); aK1++)
-      {
-          for (int aK2=0; aK2<JtWJ_sqrt.cols(); aK2++)
-          {
-              if (aK1==aK2)
-              {
-                  int id_block = std::floor(double(aK1)/3);
-               
-                  if (id_block % 2 == 0) // if even -> C
-                      covC_file << JtWJ_sqrt(aK1,aK2) << " ";
-                  else // if odd -> R
-                      covR_file << JtWJ_sqrt(aK1,aK2) << " ";
-
-                 VLOG(2) << JtWJ_sqrt(aK1,aK2) << " ";
-
-              }
-          }
-      }
+     
       VLOG(2) << "\n";
       covR_file << "\n";
       covR_file.close();
@@ -855,19 +987,7 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
           gradC_file << vn << " " ; 
       }
 
-      VLOG(2) << "gradients \n";
-      for (int aK=0; aK<my_vect.size(); aK++)
-      {
-          int id_block = std::floor(double(aK)/3);
-
-          if (id_block % 2 == 0) // if even -> C
-              gradC_file << my_vect[aK] << " ";
-          else // if odd -> R
-              gradR_file << my_vect[aK] << " ";
-                 
-          VLOG(2) << my_vect[aK] << " ";
-
-      }
+   
       VLOG(2) << "\n";
 
       gradR_file << "\n";
@@ -875,23 +995,10 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
       gradC_file << "\n";
       gradC_file.close();
 
-
-      //print hessian 
-      if (0)
-      {
-        std::cout << "hessian\n";
-        for (int aK1=0; aK1<aJ->num_cols; aK1++)
-        {
-          for (int aK2=0; aK2<aJ->num_cols; aK2++)
-          {
-              std::cout << JtWJ.coeffRef(aK1,aK2) << " ";
-          }
-          std::cout << "\n";
-        }
-      }
-
     }
-
+  
+    //delete ordering;
+    delete aProblem;
     //save final structure
     //std::string aFinStruc = views_name + "_final.ply";
     //WriteToPLYFile(aFinStruc, views_name);
@@ -958,20 +1065,21 @@ void cAppCovInMotion::SetMinimizerLocal(ceres::Solver::Options& aSolOpt)
   //S - the reduced camera matrix / the Shur complement;
   //uses the SHURR trick; solves S as a dense matrix with Cholesky factorization; i
   //for problems up to several hundreds of cameras
-  aSolOpt.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;//ceres::DENSE_SCHUR;
+  //aSolOpt.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;//ceres::DENSE_SCHUR;
   //uses the SHURR trick; solves S as a sparse matrix with Cholesky factorization;
-  //aSolOpt.linear_solver_type = ceres::SPARSE_SCHUR;
+  aSolOpt.linear_solver_type = ceres::DENSE_SCHUR;// ceres::SPARSE_SCHUR;
   //applies Preconditioned Conjugate Gradients to S; implements inexact step algorithm;
   //choose a precondition, e.g. CLUSTER_JACOBI,CLUSTER_TRIDIAGONAL that exploits camera-point visibility structure
-  //mSolopt.linear_solver_type = ceres::ITERATIVE_SHUR;
+  //aSolOpt.linear_solver_type = ceres::ITERATIVE_SCHUR;
+  //aSolOpt.use_explicit_schur_complement = true;
 
   //relaxes the requirement to decrease the obj function at each iter step;
   //may turn very efficient in the long term;
   aSolOpt.use_nonmonotonic_steps = false;
 
-  aSolOpt.max_num_iterations = 100;
-  aSolOpt.minimizer_progress_to_stdout = true;
-  aSolOpt.num_threads = _PROC_COUNT;
+  aSolOpt.max_num_iterations = 10;
+  aSolOpt.minimizer_progress_to_stdout =  false;//true;
+  aSolOpt.num_threads = m_lba_opts._PROC_COUNT;
 
   aSolOpt.use_inner_iterations = m_lba_opts._INNER_ITER;
 
@@ -983,9 +1091,11 @@ void cAppCovInMotion::SetMinimizerGlobal(ceres::Solver::Options& aSolOpt)
   //S - the reduced camera matrix / the Shur complement;
   //uses the SHURR trick; solves S as a dense matrix with Cholesky factorization; i
   //for problems up to several hundreds of cameras
-  aSolOpt.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;//ceres::DENSE_SCHUR;
+  //aSolOpt.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;//ceres::DENSE_SCHUR;
+  //aSolOpt.linear_solver_type = ceres::CGNR;
   //uses the SHURR trick; solves S as a sparse matrix with Cholesky factorization;
-  //aSolOpt.linear_solver_type = ceres::SPARSE_SCHUR;
+  aSolOpt.linear_solver_type = ceres::SPARSE_SCHUR;
+  //aSolOpt.linear_solver_type = ceres::DENSE_SCHUR;
   //applies Preconditioned Conjugate Gradients to S; implements inexact step algorithm;
   //choose a precondition, e.g. CLUSTER_JACOBI,CLUSTER_TRIDIAGONAL that exploits camera-point visibility structure
   //aSolOpt.linear_solver_type = ceres::ITERATIVE_SCHUR;
@@ -994,9 +1104,13 @@ void cAppCovInMotion::SetMinimizerGlobal(ceres::Solver::Options& aSolOpt)
   //may turn very efficient in the long term;
   aSolOpt.use_nonmonotonic_steps = false;
 
-  aSolOpt.max_num_iterations = 100;
+  /*aSolOpt.function_tolerance = 0.0;
+  aSolOpt.gradient_tolerance = 0.0;
+  aSolOpt.parameter_tolerance = 0.0;*/
+
+  aSolOpt.max_num_iterations = 200;
   aSolOpt.minimizer_progress_to_stdout = true;
-  aSolOpt.num_threads = _PROC_COUNT;
+  aSolOpt.num_threads = m_gba_opts._PROC_COUNT;
 
   aSolOpt.use_inner_iterations = m_gba_opts._INNER_ITER;
 
@@ -1022,7 +1136,8 @@ bool cAppCovInMotion::OptimizeRelMotions()
     
     std::vector<std::string> views_to_del_by_key;
 
-    #pragma omp parallel num_threads(_PROC_COUNT) 
+    //#pragma omp parallel num_threads(1) 
+    #pragma omp parallel num_threads(m_lba_opts._PROC_COUNT) 
     {
         #pragma omp for
         for(int vi=0; vi<mTriSet->mAllViewMap.size(); vi++) 
@@ -1041,24 +1156,35 @@ bool cAppCovInMotion::OptimizeRelMotions()
 
     }
 
-    //delete views with no features 
+    //delete views with no features or views with rank deficient jacobians  
+    {
+    std::cout << " # " << views_to_del_by_key.size() << " view removed\n";
     for (auto vi : views_to_del_by_key)
         mTriSet->mAllViewMap.erase(vi);
+    }
 
-    std::cout << " # " << views_to_del_by_key.size() << " view removed\n";
 
     // save local covariances to file if requested 
     if (m_lba_opts._WRITE_COV)
         WriteLocalCovs();
 
+    //print out the total res
+    //for (auto v : mTriSet->mAllViewMap)
+    //    v.second->PrintTotalRes();
+    //print out number of features per motion
+    /*for (auto v :  mFeatViewMap)
+        std::cout << v.second->size() << " ";
+    std::cout << "\n";*/ 
+
+   // getchar();
     return EXIT_SUCCESS;
 
 }
 
-bool cAppCovInMotion::OptimizeRelMotionsGlobally()
+bool cAppCovInMotion::OptimizeRelMotionsGloballyAllViewsWithDecomp()
 {
 
-    std::cout << "Global view optimization\n";
+    std::cout << "Global view optimization with quadratic form decomposition\n";
     
     ceres::Problem * aProblem = new ceres::Problem;;
     ceres::Solver::Summary        aSummary;
@@ -1067,57 +1193,132 @@ bool cAppCovInMotion::OptimizeRelMotionsGlobally()
     //add equation for each view and camera 
     for(auto view_i : mTriSet->mAllViewMap)
     {
+        std::cout << view_i.first << "\n";
 
         //similitude
         Mat3d alpha0 = view_i.second->alpha0();
-        double* Walpha = view_i.second->Walpha();
-        double* beta  = view_i.second->beta();
-        double* lambda = view_i.second->lambda();
-
+        //double* Walpha = view_i.second->Walpha();
+        //double* beta  = view_i.second->beta();
+        //double* lambda = view_i.second->lambda();
+        double* alpha_beta_l = view_i.second->alpha_beta_l();
 
         int NbCam = (&(view_i.second->View(2))==NULL) ? 2 : 3;
+
+        //collect unknowns 
+        std::vector<double*>  cVec; //relative center (only for basic adj) 
+        std::vector<Mat3d>    rVec; //relative rotations 
+        std::vector<Mat3d>    RVec; //global rotations 
+        
+
         for (int aCam=0; aCam<NbCam; aCam++)
         {
             //local pose 
-            Vec3d c (view_i.second->View(aCam).C()[0], 
-                     view_i.second->View(aCam).C()[1],
-                     view_i.second->View(aCam).C()[2]);
-            Mat3d r =  view_i.second->View(aCam).R();
-            //double*  aW = view_i->View(aCam).Omega(); to consider including it
+            rVec.push_back(view_i.second->View(aCam).R());
+            cVec.push_back(view_i.second->View(aCam).C());
+
 
             //initial global pose
             cPose*& pose = mTriSet->Pose(view_i.second->View(aCam).Name());
-            //constant 
-            Mat3d R0 = pose->R();
-            //parameters 
-            double* C = pose->C();
-            double* W = pose->Omega();
-           
-            //covariance 
-            int loc = aCam*6;
-            Mat6d cov = view_i.second->Hg_().H_().block(loc,loc,6,6);
 
-    
-            /*CostFunction * aCost = 
-                cResidualOnViewPose::Create(alpha0,beta,lambda,r,c,R0,cov);
-
-            LossFunction * aLoss = new HuberLoss(m_gba_opts._HUBER_S);
-            
-            aProblem->AddResidualBlock(aCost,aLoss,C,W);*/
-
-            CostFunction * aCost = 
-                cResidualOnViewPoseAffFree::Create(alpha0,r,c,R0,cov);
-
-            LossFunction * aLoss = new HuberLoss(m_gba_opts._HUBER_S);
-            aProblem->AddResidualBlock(aCost,aLoss,C,W,Walpha,beta,lambda);
-            
-            //flag as refined 
-            pose->SetRefined();
+            //parameters / constants  
+            RVec.push_back(pose->R());
+          
         }
+
+        //covariance 
+        VecXd Wi = view_i.second->Wi();
+        MatXd Li = view_i.second->Li();
+        VecXd Cstei = view_i.second->Cstei();
+
+        double total_res = view_i.second->TotalRes();
+
+
+        cPose*& pose0 = mTriSet->Pose(view_i.second->View(0).Name());
+        cPose*& pose1 = mTriSet->Pose(view_i.second->View(1).Name());
+        
+        double * C0 = pose0->C();
+        double * W0 = pose0->Omega();
+        
+        double * C1 = pose1->C();
+        double * W1 = pose1->Omega();
+
+        if (NbCam==2)
+        {
+            if (m_gba_opts._PROPAGATE)
+            {
+                /* Unknown poses, constant similarity */ 
+                /*CostFunction * aCost = cResidualOn2ViewsPoseDecomp::Create(alpha0,beta,lambda,
+                                                      rVec,RVec,
+                                                      Wi,Li,Cstei) ;
+                aProblem->AddResidualBlock(aCost,NULL,
+                                     C0,W0,C1,W1);*/
+             
+                CostFunction * aCost = cResidualOn2ViewsPoseDecompLAB::Create(alpha0,
+                                                      rVec,RVec,
+                                                      Wi,Li,Cstei,total_res) ;
+          
+                LossFunction * aLoss = NULL; //new HuberLoss(m_gba_opts._HUBER_S);
+
+                aProblem->AddResidualBlock(aCost,aLoss,
+                                     C0,W0,C1,W1,alpha_beta_l);
+                }
+            else
+            {
+                CostFunction* Cost = cResidualOn3ViewsPoseBasicLAB::Create(alpha0,cVec,rVec,RVec);
+                LossFunction * Loss = NULL;
+                aProblem->AddResidualBlock(Cost,Loss,C0,W0,C1,W1,alpha_beta_l);
+                                                                           
+            }
+        }
+
+
+        if (NbCam==3)
+        {
+            
+            cPose*& pose2 = mTriSet->Pose(view_i.second->View(2).Name());
+         
+            double * C2 = pose2->C();
+            double * W2 = pose2->Omega();
+        
+            if (m_gba_opts._PROPAGATE)
+            {
+                /* Unknown poses, constant similarity */ 
+                /*Vec3d beta {alpha_beta_l[3],alpha_beta_l[4],alpha_beta_l[5]};
+                double L = alpha_beta_l[6];
+                CostFunction * aCost = cResidualOn3ViewsPoseDecomp::Create(alpha0,beta,L,
+                                                      rVec,RVec,
+                                                      Wi,Li,Cstei) ;
+                aProblem->AddResidualBlock(aCost,NULL,
+                                     C0,W0,C1,W1,C2,W2); */
+          
+                CostFunction * aCost = cResidualOn3ViewsPoseDecompLAB::Create(alpha0,
+                                                      rVec,RVec,
+                                                      Wi,Li,Cstei,
+                                                      total_res) ; 
+          
+                LossFunction * aLoss = NULL; //new HuberLoss(m_gba_opts._HUBER_S);
+                aProblem->AddResidualBlock(aCost,aLoss,
+                                     C0,W0,C1,W1,C2,W2,alpha_beta_l);
+            }
+            else
+            {
+                CostFunction* Cost = cResidualOn3ViewsPoseBasicLAB::Create(alpha0,cVec,rVec,RVec);
+                LossFunction * Loss = NULL;
+                aProblem->AddResidualBlock(Cost,Loss,C0,W0,C1,W1,C2,W2,alpha_beta_l);
+
+            }
+         
+           
+        }
+       
+        for (int aCam=0; aCam<NbCam; aCam++)
+            mTriSet->Pose(view_i.second->View(aCam).Name())->SetRefined();
+
+        
     }
 
     //add constraint on initial global poses 
-    std::vector<ceres::ResidualBlockId> res_bloc_CR;
+/*
     for (auto pose_i : mTriSet->mGlobalPoses)
     {
         if (pose_i.second->IsRefined())
@@ -1128,27 +1329,67 @@ bool cAppCovInMotion::OptimizeRelMotionsGlobally()
             double* W = pose_i.second->Omega();
             double* W_immutable = pose_i.second->Omega_immutable();
         
-            LossFunction * aLossW = new HuberLoss(m_gba_opts._HUBER_P);
-            LossFunction * aLossC = new HuberLoss(m_gba_opts._HUBER_P);
+            //LossFunction * aLossW = new HuberLoss(m_gba_opts._HUBER_P);
+            //LossFunction * aLossC = new HuberLoss(m_gba_opts._HUBER_P);
             
             //perspective center
             CostFunction * CostC = cPoseConstraint::Create(C_immutable,m_gba_opts._C_PDS);
-            ceres::ResidualBlockId res_C_id = aProblem->AddResidualBlock(CostC,aLossC,(C));
-            res_bloc_CR.push_back(res_C_id);
+            ceres::ResidualBlockId res_C_id = aProblem->AddResidualBlock(CostC,NULL,(C));
 
             //small rotation
             CostFunction * CostR = cPoseConstraint::Create(W_immutable,m_gba_opts._ROT_PDS);
-            ceres::ResidualBlockId res_W_id = aProblem->AddResidualBlock(CostR,aLossW,(W));
-            res_bloc_CR.push_back(res_W_id);
+            ceres::ResidualBlockId res_W_id = aProblem->AddResidualBlock(CostR,NULL,(W));
         }
     }
-    //TODO add constraint on initial similarity 
-    //add immutable parameters
-
-
+*/
+    
     //solve the least squares problem
     ceres::Solver::Options Opts;
     SetMinimizerGlobal(Opts);
+
+    // Set ordering (necessary for Schur)
+    ceres::ParameterBlockOrdering* ordering =
+    new ceres::ParameterBlockOrdering;
+    // The 3d similarity come before the cameras.
+    for(auto view_i : mTriSet->mAllViewMap)
+    {
+        //similitude
+        double* alpha_beta_l = view_i.second->alpha_beta_l();
+
+        ordering->AddElementToGroup(alpha_beta_l, 0);
+    }
+    for (auto pose_i : mTriSet->mGlobalPoses)
+    {
+        if (pose_i.second->IsRefined())
+        {
+            //parameters 
+            double* C = pose_i.second->C();
+            double* W = pose_i.second->Omega();
+
+            ordering->AddElementToGroup(C, 1);
+            ordering->AddElementToGroup(W, 1);
+        }
+    }
+    Opts.linear_solver_ordering.reset(ordering);
+
+/*
+ *  // Set ordering (necessary for Schur)
+    ceres::ParameterBlockOrdering* ordering =
+    new ceres::ParameterBlockOrdering;
+    // The points come before the cameras.
+    for (int aK=0; aK<aNbPts; aK++)
+    {
+        ordering->AddElementToGroup(aFeat3d->at(aK), 0);
+    }
+    for (int aCam=0; aCam<NbCam; aCam++)
+    {
+        ordering->AddElementToGroup(views->View(aCam).C(), 1);
+        ordering->AddElementToGroup(views->View(aCam).Omega(), 1);
+        
+    }
+    aOpts.linear_solver_ordering.reset(ordering);
+ * */
+
 
     ceres::Solve(Opts,aProblem,&aSummary);
     std::cout << aSummary.FullReport() << "\n";
@@ -1162,7 +1403,7 @@ bool cAppCovInMotion::OptimizeRelMotionsGlobally()
         Problem::EvaluateOptions eval_opts;
         eval_opts.apply_loss_function = false;
  
-        eval_opts.residual_blocks = res_bloc_CR;
+        //eval_opts.residual_blocks = res_bloc_CR;
         std::vector<double> residuals;
  
         bool eval_success = aProblem->Evaluate(eval_opts, &cost, &residuals, nullptr, nullptr);
@@ -1192,10 +1433,14 @@ bool cAppCovInMotion::OptimizeRelMotionsGlobally()
     }
 
     /* Update the similarity transformation */
-    mTriSet->UpdateAllAffine();
+    //mTriSet->UpdateAllAffine();
+
+    delete aProblem;
 
     return EXIT_SUCCESS;
 }
+
+
 
 //obsolete
 bool cAppCovInMotion::OptimizeGlobally()
@@ -1408,7 +1653,7 @@ cAppCovInMotion::cAppCovInMotion(const InputFiles& inputs,
                     const bool do_extra_cov_check) :
     GET_COVARIANCES(do_extra_cov_check)
 {
-    std::cout << _PROC_COUNT << "\n";
+    std::cout << m_lba_opts._PROC_COUNT << " "<< m_gba_opts._PROC_COUNT << "\n";
 
     try 
     {
@@ -1442,18 +1687,24 @@ cAppCovInMotion::cAppCovInMotion(const InputFiles& inputs,
         if (0)
           mTriSet->PrintAllPoses();
 
+        if (0)
+            mTriSet->WriteGlobalPFromRelPAndSim("pose_predictions.txt");
  
         /* Get covariances per motion */
-        OptimizeRelMotions();
+        if (m_gba_opts._PROPAGATE)
+            OptimizeRelMotions();
  
         /* Run global bundle adjustment using "relative" covariances */
-        OptimizeRelMotionsGlobally();
+        OptimizeRelMotionsGloballyAllViewsWithDecomp();
+        //OptimizeRelMotionsGloballyWithDecomp();
         //OptimizeRelMotionsGlobally();
- 
+//getchar(); 
         mTriSet->SaveGlobalPoses(inputs.output_poses_file);
         
         if (0)
-          mTriSet->PrintAllPosesDelta();
+            mTriSet->PrintAllPosesDelta();
+        if (1)
+            mTriSet->PrintSumDelta();
 
     }
     catch (std::exception& e)

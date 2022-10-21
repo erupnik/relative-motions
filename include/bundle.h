@@ -49,74 +49,234 @@ class cPoseConstraint
       const double   pose_pds;
 };
 
-/* under dev */
-class cResidualOnViewPoseAffFree
+class cCoordConstraint
 {
-    public: 
-        cResidualOnViewPoseAffFree(const Mat3d alpha0, const Mat3d r0, const Vec3d c0, const Mat3d R0, const Mat6d covariance) :
-                                               m_alpha0(alpha0),
-                                               m_r0(r0),
-                                               m_c0(c0),
-                                               m_R0(R0),
-                                               m_cov(covariance) {}
-        ~cResidualOnViewPoseAffFree(){}
-
+    public:
+        cCoordConstraint(const double* init_val, double val_pds):
+            init_val(init_val), val_pds(val_pds) {}
+        ~cCoordConstraint() {}
 
         template <typename T>
-            bool operator()(const T* const C, const T* const W, 
-                            const T* const Walpha, const T* const beta, const T* const lambda, 
-                            T* Residual) const;
-                                
-        static CostFunction* Create(const Mat3d alpha0,
-                                    const Mat3d r0, const Vec3d c0, const Mat3d R0, const Mat6d covariance);
+        bool operator()(const T* const obs_val, T* Residual) const {
+              Residual[0] = (obs_val[0] - init_val[0])/val_pds;
+              return true;
+        }
+        static CostFunction * Create(const double* coord_value, const double coord_pds){
+          return  (new AutoDiffCostFunction<cCoordConstraint,1,3> (new cCoordConstraint(
+            coord_value,coord_pds)));
+      }
+
 
     private:
-        const Mat3d m_alpha0;
-
-        const Mat3d m_r0;
-        const Vec3d m_c0;
-
-        const Mat3d m_R0;
-
-        const Mat6d m_cov;
+        const double* init_val;
+        const double  val_pds;
 };
 
-class cResidualOnViewPose
+/* Residuals weighted by the covariance
+ * (with decomposition of the quadratic cost into a sum of linear terms)
+ * - unknowns C, WR
+ * - constants alpha, beta, lambda (similarity trafo) and eveyrthing related to covariances */
+class cResidualOn3ViewsPoseDecomp
 {
-    public: 
-        cResidualOnViewPose(const Mat3d alpha, const double* beta, const double* lambda,
-                            const Mat3d r0, const Vec3d c0, const Mat3d R0, const Mat6d covariance) :
-                                               m_alpha(alpha),
-                                               m_beta(beta),
-                                               m_lambda(lambda),
-                                               m_r0(r0),
-                                               //m_r0_inv_alpha_R0(r0.inverse() * alpha * R0),
-                                               m_alpha_R0(alpha * R0),
-                                               m_c0(c0),
-                                               m_R0(R0),
-                                               m_cov(covariance) {}
-        ~cResidualOnViewPose(){}
+    public:
+        cResidualOn3ViewsPoseDecomp(const Mat3d alpha, const Vec3d beta, const double L, 
+                                   const std::vector<Mat3d> rV, const std::vector<Mat3d> R0V,
+                                   const VecXd Wi, const MatXd Li, const VecXd Cstei, const double total_res) :
+                                  m_beta(beta),
+                                  m_L(L),
+                                  m_rV(rV),
+                                  m_R0V(R0V),
+                                  m_Wi(Wi),
+                                  m_Li(Li),
+                                  m_Cstei(Cstei),
+                                  m_tot_res(total_res) {}
+
+        ~cResidualOn3ViewsPoseDecomp(){}
 
         template <typename T>
-            bool operator()(const T* const C, const T* const W, T* Residual) const;
+            bool operator()(const T* const C0, const T* const W0,
+                            const T* const C1, const T* const W1,
+                            const T* const C2, const T* const W2, T* Residual) const;
+                                
+        static CostFunction* Create(const Mat3d alpha, const Vec3d beta, const double L, 
+                                    const std::vector<Mat3d> r0V, const std::vector<Mat3d> R0V,
+                                    const VecXd Wi, const MatXd Li, const VecXd Cstei, const double total_res);
 
-        static CostFunction* Create(const Mat3d alpha, const double* beta, const double* lambda,
-                                    const Mat3d r0, const Vec3d c0, const Mat3d R0, const Mat6d covariance);
-        //static CostFunction* Create(const Mat3d alpha, const Vec3d beta, const double lambda,
-        //                           const Mat3d r0, const Vec3d c0, const Mat3d R0, const Mat6d covariance);
 
-    private:
+            private:
+        /* Constants */
+        const Mat3d m_alpha;
+        const Vec3d m_beta;
+        const double m_L;
+        const std::vector<Mat3d> m_rV;
+        const std::vector<Mat3d> m_R0V;
+
+        /* Covariance-related */
+        const VecXd m_Wi;
+        const MatXd m_Li;
+        const VecXd m_Cstei;
+
+        const double m_tot_res;
+
+};
+class cResidualOn2ViewsPoseDecomp
+{
+    public:
+        cResidualOn2ViewsPoseDecomp(const Mat3d alpha, const double* beta, const double* lambda, 
+                                   const std::vector<Mat3d> rV, const std::vector<Mat3d> R0V,
+                                   const VecXd Wi, const MatXd Li, const VecXd Cstei, const double total_res) :
+                                  m_alpha(alpha),
+                                  m_beta(beta),
+                                  m_lambda(lambda),
+                                  m_rV(rV),
+                                  m_R0V(R0V),
+                                  m_Wi(Wi),
+                                  m_Li(Li),
+                                  m_Cstei(Cstei),
+                                  m_tot_res(total_res) {}
+
+        ~cResidualOn2ViewsPoseDecomp(){}
+
+        template <typename T>
+            bool operator()(const T* const C0, const T* const W0,
+                            const T* const C1, const T* const W1, T* Residual) const;
+                                
+        static CostFunction* Create(const Mat3d alpha, const double* beta, const double* lambda, 
+                                    const std::vector<Mat3d> r0V, const std::vector<Mat3d> R0V,
+                                    const VecXd Wi, const MatXd Li, const VecXd Cstei, const double total_res);
+
+
+            private:
+        /* Constants */
         const Mat3d m_alpha;
         const double* m_beta;
         const double* m_lambda;
+        const std::vector<Mat3d> m_rV;
+        const std::vector<Mat3d> m_R0V;
 
-        const Mat3d m_r0;
-        const Mat3d m_alpha_R0;
-        const Vec3d m_c0;
+        /* Covariance-related */
+        const VecXd m_Wi;
+        const MatXd m_Li;
+        const VecXd m_Cstei;
+        
+        const double m_tot_res;
 
-        const Mat3d m_R0;
+};
 
-        const Mat6d m_cov;
+class cResidualOn3ViewsPoseDecompLAB
+{
+    public:
+        cResidualOn3ViewsPoseDecompLAB(const Mat3d alpha0, const std::vector<Mat3d> rV, const std::vector<Mat3d> R0V,
+                                   const VecXd Wi, const MatXd Li, const VecXd Cstei, const double total_res) :
+                                  m_alpha0(alpha0),
+                                  m_rV(rV),
+                                  m_R0V(R0V),
+                                  m_Wi(Wi),
+                                  m_Li(Li),
+                                  m_Cstei(Cstei),
+                                  m_tot_res(total_res) {}
+
+        ~cResidualOn3ViewsPoseDecompLAB(){}
+
+        template <typename T>
+            bool operator()(const T* const C0, const T* const W0,
+                            const T* const C1, const T* const W1,
+                            const T* const C2, const T* const W2, 
+                            const T* const alpha_beta_L, T* Residual) const;
+                                
+        static CostFunction* Create(const Mat3d alpha0, 
+                                    const std::vector<Mat3d> r0V, const std::vector<Mat3d> R0V,
+                                    const VecXd Wi, const MatXd Li, const VecXd Cstei, const double total_res);
+
+
+    private:
+        /* Constants */
+        const Mat3d m_alpha0;
+        const std::vector<Mat3d> m_rV;
+        const std::vector<Mat3d> m_R0V;
+
+        /* Covariance-related */
+        const VecXd m_Wi;
+        const MatXd m_Li;
+        const VecXd m_Cstei;
+        
+        const double m_tot_res;
+
+};
+
+class cResidualOn2ViewsPoseDecompLAB
+{
+    public:
+        cResidualOn2ViewsPoseDecompLAB(const Mat3d alpha0, 
+                                   const std::vector<Mat3d> rV, const std::vector<Mat3d> R0V,
+                                   const VecXd Wi, const MatXd Li, const VecXd Cstei, const double total_res) :
+                                  m_alpha0(alpha0),
+                                  m_rV(rV),
+                                  m_R0V(R0V),
+                                  m_Wi(Wi),
+                                  m_Li(Li),
+                                  m_Cstei(Cstei),
+                                  m_tot_res(total_res) {}
+
+        ~cResidualOn2ViewsPoseDecompLAB(){}
+
+        template <typename T>
+            bool operator()(const T* const C0, const T* const W0,
+                            const T* const C1, const T* const W1, 
+                            const T* const alpha_beta_L, T* Residual) const;
+                                
+        static CostFunction* Create(const Mat3d alpha0, 
+                                    const std::vector<Mat3d> r0V, const std::vector<Mat3d> R0V,
+                                    const VecXd Wi, const MatXd Li, const VecXd Cstei, const double total_res);
+
+
+            private:
+        /* Constants */
+        const Mat3d m_alpha0;
+        const std::vector<Mat3d> m_rV;
+        const std::vector<Mat3d> m_R0V;
+
+        /* Covariance-related */
+        const VecXd m_Wi;
+        const MatXd m_Li;
+        const VecXd m_Cstei;
+
+        const double m_tot_res;
+};
+
+/* Basic adjustment without covariance propagation 
+ * * Wr=0 */
+class cResidualOn3ViewsPoseBasicLAB
+{
+    public:
+        cResidualOn3ViewsPoseBasicLAB(const Mat3d alpha0, const std::vector<double*> cV, const std::vector<Mat3d> rV, const std::vector<Mat3d> R0V) :
+                                  m_alpha0(alpha0),
+                                  m_cV(cV),
+                                  m_rV(rV),
+                                  m_R0V(R0V){}
+
+        ~cResidualOn3ViewsPoseBasicLAB(){}
+
+        template <typename T>
+            bool operator()(const T* const C0, const T* const W0,
+                            const T* const C1, const T* const W1,
+                            const T* const C2, const T* const W2, 
+                            const T* const alpha_beta_L, T* Residual) const;
+                                
+        static CostFunction* Create(const Mat3d alpha0, 
+                                    const std::vector<double*> c0V,
+                                    const std::vector<Mat3d> r0V, 
+                                    const std::vector<Mat3d> R0V);
+
+
+    private:
+        /* Constants */
+        const Mat3d m_alpha0;
+        const std::vector<double*> m_cV;
+        const std::vector<Mat3d> m_rV;
+        const std::vector<Mat3d> m_R0V;
+
+   
 };
 
 class cResidualOnPose
@@ -148,8 +308,8 @@ class cResidualOnPose
 class cResidualError
 {
     public :
-        cResidualError(const Mat3d aRot0,const Vec2d aPtBundle,const double aPdsSqrt) :
-            mRot0(aRot0), mPtBundle(aPtBundle), mPdsSqrt(aPdsSqrt) {}
+        cResidualError(const Mat3d aRot0,const Vec2d aPtBundle,const double aPdsSqrt,const double Foc) :
+            mRot0(aRot0), mPtBundle(aPtBundle), mPdsSqrt(aPdsSqrt), mFoc(Foc) {}
         ~cResidualError(){}
 
         // Parameters: pose and 3d points
@@ -160,14 +320,16 @@ class cResidualError
                         T* Residual) const;
         static CostFunction * Create(const Mat3d mRotCur,
                                      const Vec2d PtBundle,
-                                     const double PdsSqrt);
+                                     const double PdsSqrt,
+                                     const double Foc);
 
     private:
 
         const Mat3d   mRot0;
         const Vec2d   mPtBundle;
         const double  mPdsSqrt;
-
+        
+        const double mFoc;
 };
 
 
