@@ -632,7 +632,8 @@ void cTripletSet::WriteGlobalPFromRelPAndSim(const std::string& filename)
             Vec3d T;
             LocalToGlobal(a3v.second,view,R,T);
 
-            eo_file << im_name << " " << R(0,0) << " " << R(0,1) << " " << R(0,2)
+            //eo_file << im_name << " " << R(0,0) << " " << R(0,1) << " " << R(0,2)
+            eo_file << a3v.second->View(view).Name() << " " << R(0,0) << " " << R(0,1) << " " << R(0,2)
                                << " " << R(1,0) << " " << R(1,1) << " " << R(1,2)
                                << " " << R(2,0) << " " << R(2,1) << " " << R(2,2)
                                << " " << T[0]
@@ -751,11 +752,11 @@ std::vector<double> cFilterTrip::CalcVecRes(std::vector<Vec3d>& data,Vec3d& poin
 }
 
 /* Calculate stats using rotation and translation */
-bool cFilterTrip::CalcStats(std::vector<Vec3d>& dataT,std::vector<Mat3d>& dataR,
+std::pair<double,double>  cFilterTrip::CalcStats(std::vector<Vec3d>& dataT,std::vector<Mat3d>& dataR,
                             std::vector<int>& inlier_id,std::vector<int>& outlier_id)
 {
     if (dataT.size() != dataR.size())
-        return EXIT_FAILURE;
+        return std::make_pair<double,double>(1e10,1e10);
 
     int num =  dataT.size();
 
@@ -775,7 +776,7 @@ bool cFilterTrip::CalcStats(std::vector<Vec3d>& dataT,std::vector<Mat3d>& dataR,
     }
     //get residual corresponding to 25% quantile 
     residuals_cpy = residuals;
-    double qperc = 0.75;
+    double qperc = 0.5;
     double res_quant = FindQuantile(residuals_cpy,qperc);
     
     //find the pose correponding to the qunatile
@@ -786,6 +787,7 @@ bool cFilterTrip::CalcStats(std::vector<Vec3d>& dataT,std::vector<Mat3d>& dataR,
     Mat3d quantR = dataR[pos_quant];
 
     //compute residuals wrt to the new pose (recovered as 25%quantile)
+    double ressom=0.0;
     residuals.clear();
     residuals_cpy.clear();
     double vmin=1e10, vmax=-1e10;
@@ -795,8 +797,10 @@ bool cFilterTrip::CalcStats(std::vector<Vec3d>& dataT,std::vector<Mat3d>& dataR,
         if (res>vmax) vmax = res;
         if (res<vmin) vmin = res;
 
+        ressom+=res;
         residuals.push_back(res);
     }
+    ressom/=num;
 
     //compute quantile on new residuals 
     //residuals_cpy = residuals;
@@ -834,7 +838,7 @@ bool cFilterTrip::CalcStats(std::vector<Vec3d>& dataT,std::vector<Mat3d>& dataR,
 
     //getchar();
 
-    return EXIT_SUCCESS;
+    return std::pair<double,double>(ressom,std_dev);
 }
 
 double cFilterTrip::FindQuantile(std::vector<double>& v, double p)
@@ -933,6 +937,7 @@ void cFilterTrip::SaveViews(cTripletSet& Tri,
 cFilterTrip::cFilterTrip(std::string views,
                          std::string simil,
                          bool do_only_pred,
+                         int  filter_mode,
                          std::string outgpose,
                          std::string gpose,
                          std::string filtered_views)
@@ -940,10 +945,14 @@ cFilterTrip::cFilterTrip(std::string views,
     std::cout << "Relative motion filter" << "\n";
 
     ONLY_PREDICTION = do_only_pred;
+    FILTER_MODE = filter_mode;
 
     cTripletSet aTriSet(views,simil,gpose);
     aTriSet.ReadViews();
     aTriSet.ReadSimGlobal();
+    aTriSet.ReadGlobalPoses();
+
+
     //aTriSet.PrintAllViews();
 
     if (ONLY_PREDICTION)
@@ -993,89 +1002,200 @@ cFilterTrip::cFilterTrip(std::string views,
                 }
             }
         }
- 
-        //collect all outliers first 
-        for (auto p : map_pose_predC)
+       
+        if (FILTER_MODE==1)//do filter
         {
-            std::vector<std::string> rel_poses_i = map_pose_relmotion[p.first];
-            
-            std::vector<int> inliers;
-            std::vector<int> outliers;
- 
-            CalcStats(p.second,map_pose_predR[p.first],inliers,outliers);
-            if (outliers.size())
+            //collect all outliers first
+            double ErrMoyAll=0.0;
+            double StdEcAll=0.0;
+            for (auto p : map_pose_predC)
             {
- 
-                for(auto out : outliers)
+                std::vector<std::string> rel_poses_i = map_pose_relmotion[p.first];
+                
+                std::vector<int> inliers;
+                std::vector<int> outliers;
+         
+                std::pair<double,double> stats_pair = CalcStats(p.second,map_pose_predR[p.first],inliers,outliers);
+                ErrMoyAll += stats_pair.first ;
+                StdEcAll  += stats_pair.second;
+                if (outliers.size())
                 {
-                    std::list<std::string>::iterator f_it = std::find(list_rmotion_outliers.begin(),
-                              list_rmotion_outliers.end(), rel_poses_i[out]);
- 
-                    std::cout << "rel_poses_i[in]=" << rel_poses_i[out] << ", out=" << out << "\n";
-                    if ( list_rmotion_outliers.size()==0)
+         
+                    for(auto out : outliers)
                     {
-                        list_rmotion_outliers.push_back(rel_poses_i[out]); 
-                    }
-                    else if(f_it == list_rmotion_outliers.end())
-                    {
-                        list_rmotion_outliers.push_back(rel_poses_i[out]); 
-                    }
- 
-                }
-            }
-        }
- 
- 
-        //identify inliers and save
-        int cnt_inliers=0, cnt_all=0;
-        for (auto p : map_pose_predC)
-        {
-            std::cout << p.first << " ";
-            std::vector<std::string> rel_poses_i = map_pose_relmotion[p.first];
-            
-            std::vector<int> inliers;
-            std::vector<int> outliers;
- 
-            //CalcConservStats(p.second,inliers,outliers);
-            CalcStats(p.second,map_pose_predR[p.first],inliers,outliers);
- 
- 
-            if (inliers.size())
-            {
-                cnt_all += p.second.size();
- 
-                std::cout << " inliers=" << inliers.size() << "/" << p.second.size() << "\n";
- 
-                for (auto in : inliers)
-                {
-                    std::list<std::string>::iterator f_it = std::find(list_rmotion_inliers.begin(),
-                              list_rmotion_inliers.end(), rel_poses_i[in]);
-                    std::list<std::string>::iterator fo_it = std::find(list_rmotion_outliers.begin(),
-                              list_rmotion_outliers.end(), rel_poses_i[in]);
- 
- 
-                    if (fo_it==list_rmotion_outliers.end())
-                    {
-                        cnt_inliers++;
-                        
-                        std::cout << "rel_poses_i[in]=" << rel_poses_i[in] << ", in=" << in << "\n";
-                        if (list_rmotion_inliers.size()==0) 
+                        std::list<std::string>::iterator f_it = std::find(list_rmotion_outliers.begin(),
+                                  list_rmotion_outliers.end(), rel_poses_i[out]);
+         
+                        //std::cout << "rel_poses_i[in]=" << rel_poses_i[out] << ", out=" << out << "\n";
+                        if ( list_rmotion_outliers.size()==0)
                         {
-                            list_rmotion_inliers.push_back(rel_poses_i[in]); 
+                            list_rmotion_outliers.push_back(rel_poses_i[out]); 
                         }
-                        else if(f_it == list_rmotion_inliers.end())
+                        else if(f_it == list_rmotion_outliers.end())
                         {
-                            list_rmotion_inliers.push_back(rel_poses_i[in]); 
+                            list_rmotion_outliers.push_back(rel_poses_i[out]); 
                         }
+         
                     }
                 }
             }
+         
+         
+            //identify inliers and save
+            int cnt_inliers=0, cnt_all=0;
+            double ErrMoyIn=0.0;
+            double StdEcIn=0.0;
+         
+            for (auto p : map_pose_predC)
+            {
+                std::cout << p.first << " ";
+                std::vector<std::string> rel_poses_i = map_pose_relmotion[p.first];
+                
+                std::vector<int> inliers;
+                std::vector<int> outliers;
+         
+                //CalcConservStats(p.second,inliers,outliers);
+                std::pair<double,double> stats_pair = CalcStats(p.second,map_pose_predR[p.first],inliers,outliers);
+                ErrMoyIn += stats_pair.first ;
+                StdEcIn  += stats_pair.second;
+         
+         
+                if (inliers.size())
+                {
+                    cnt_all += p.second.size();
+         
+                    //std::cout << " inliers=" << inliers.size() << "/" << p.second.size() << "\n";
+         
+                    for (auto in : inliers)
+                    {
+                        std::list<std::string>::iterator f_it = std::find(list_rmotion_inliers.begin(),
+                                  list_rmotion_inliers.end(), rel_poses_i[in]);
+                        std::list<std::string>::iterator fo_it = std::find(list_rmotion_outliers.begin(),
+                                  list_rmotion_outliers.end(), rel_poses_i[in]);
+         
+         
+                        if (fo_it==list_rmotion_outliers.end())
+                        {
+                            cnt_inliers++;
+                            
+                            //std::cout << "rel_poses_i[in]=" << rel_poses_i[in] << ", in=" << in << "\n";
+                            if (list_rmotion_inliers.size()==0) 
+                            {
+                                list_rmotion_inliers.push_back(rel_poses_i[in]); 
+                            }
+                            else if(f_it == list_rmotion_inliers.end())
+                            {
+                                list_rmotion_inliers.push_back(rel_poses_i[in]); 
+                            }
+                        }
+                    }
+                }
+            }
+            std::cout << "Global stats: " << ErrMoyAll/cnt_all << " " << StdEcAll/cnt_all << "\n";
+            std::cout << "Inlier stats: " << ErrMoyIn/cnt_all << " " << StdEcIn/cnt_all << "\n";
+            std::cout << "Filter acceptance rate: " << double(cnt_inliers)/(cnt_all)*100 << "\n";
+         
+            SaveViews(aTriSet,list_rmotion_inliers,"inlier-"+filtered_views);
+            SaveViews(aTriSet,list_rmotion_outliers,"outlier-"+filtered_views);
         }
-        std::cout << "Filter acceptance rate: " << double(cnt_inliers)/(cnt_all)*100 << "\n";
- 
-        SaveViews(aTriSet,list_rmotion_inliers,"inlier-"+filtered_views);
-        SaveViews(aTriSet,list_rmotion_outliers,"outlier-"+filtered_views);
+        //remove triplets away from the initial global poses 
+        else if (FILTER_MODE==2)//do filter
+        {
+            if (int(map_pose_predR.size()) == int(map_pose_predC.size()))
+            {
+                for (auto  iPoseC : map_pose_predC)
+                //for (int  iPose=0; iPose< int(map_pose_predC.size()); iPose++)
+                {
 
+                    std::string aPName = iPoseC.first;
+                    cPose*& aPGlob = aTriSet.Pose(aPName);
+
+                    std::cout << aPName << " \n" << aPGlob->C()[0] << " " 
+                                                 << aPGlob->C()[1] << " " 
+                                                 << aPGlob->C()[2] << " \n" ;
+
+                    //predicted rotations of the corresponding pose 
+                    std::vector<Mat3d>& pred_R_current = map_pose_predR[aPName];
+
+
+
+                    double ErrC=0.0;
+                    std::vector<double> ErrCVec;
+                    Mat3d ErrR=MatXd::Zero(3,3);;
+                    std::vector<double> ErrRVec;
+
+                    int PredId=0;
+                    for (auto iPred : iPoseC.second)
+                    {
+
+                        double ErrCCur = std::sqrt(std::pow(aPGlob->C()[0]-iPred[0],2) +
+                                          std::pow(aPGlob->C()[1]-iPred[1],2) + 
+                                          std::pow(aPGlob->C()[2]-iPred[2],2));
+                        ErrC += ErrCCur;
+                        ErrCVec.push_back(ErrCCur);
+
+
+                        Mat3d ErrRCur = (aPGlob->R()-pred_R_current[PredId]);
+                        ErrR += NearestRotation(ErrRCur);
+                
+                        double ErrRSom=0;
+                        for (int k=0; k<3; k++)
+                            for (int l=0; l<3; l++)
+                                ErrRSom += std::abs(ErrRCur(k,l));
+                        
+                        ErrRVec.push_back(ErrRSom);
+
+                        PredId++;
+                    }
+                    double MedCErr=FindQuantile(ErrCVec,0.5);
+                    double MedRErr=FindQuantile(ErrRVec,0.5);
+                 
+
+                    ErrC /= PredId;
+                    ErrR /= PredId;
+                    double ErrRScal = 0.0;
+                    for (int i=0; i<3; i++)
+                        for (int j=0; j<3; j++)
+                            ErrRScal += std::abs(ErrR(i,j));
+                    
+                     
+                    std::cout << "MedCErr=" << MedCErr << ", ErrC=" << ErrC << "\n";
+                    std::cout << "MedRErr=" << MedRErr << ", ErrR=" << ErrRScal << "\n";
+                    std::cout << " done\n";
+
+                    /**/
+
+                    //collect the inliers
+                    std::vector<std::string> rel_poses_i = map_pose_relmotion[aPName];
+                    PredId=0;
+                    for (auto iPred : iPoseC.second)
+                    {
+                        if (ErrCVec[PredId] < 2*MedCErr)
+                        {
+                            if (ErrRVec[PredId] < 2*MedRErr)
+                            {
+
+                                if ( list_rmotion_inliers.end() == 
+                                        std::find(list_rmotion_inliers.begin(), 
+                                                  list_rmotion_inliers.end(), 
+                                                  rel_poses_i[PredId]))
+                                {
+                                    list_rmotion_inliers.push_back(rel_poses_i[PredId]);
+                                }
+                            }
+                        }
+
+                        PredId++;
+                    }
+                    //getchar();
+
+
+                }
+
+                SaveViews(aTriSet,list_rmotion_inliers,"inlier2-"+filtered_views);
+
+            }
+        }
 
     }
 

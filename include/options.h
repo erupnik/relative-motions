@@ -60,8 +60,17 @@ struct LocalBundleOptions
         
         // huber loss threshold
         // (in the unit of the normalized features)
-        double _HUBER=1; 
-      
+        double _HUBER=1;
+
+        // maximum reprojetion error threshold
+        double _MAX_ERR=3.0;
+
+        // weight limiting the features to a number of observations 
+        double _NB_LIAIS=10.0;
+
+        // minimum number of image observations 
+        int _MIN_NUM_OBS=60; //=3*50
+
         // maximum Hessian trace value, 
         // motions above this value are not considered
         double _TRACE_H = 10e15;

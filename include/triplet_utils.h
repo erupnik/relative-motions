@@ -60,13 +60,14 @@ class cFilterTrip
         cFilterTrip(std::string views,
                     std::string simil,
                     bool do_only_pred,
+                    int  filter_mode=1,
                     std::string outgpose="",
                     std::string gpose="",
                     std::string filterd_views="");
 
     private:
-        bool CalcStats(std::vector<Vec3d>&, std::vector<Mat3d>&,
-                       std::vector<int>&,std::vector<int>&);
+        std::pair<double,double> CalcStats(std::vector<Vec3d>&, std::vector<Mat3d>&,
+                                 std::vector<int>&,std::vector<int>&);
         void CalcConservStats(std::vector<Vec3d>&, std::vector<int>&,std::vector<int>&);
         double DistanceRot(const Mat3d& R1,const Vec3d& C1, const Mat3d& R2,const Vec3d& C2);
         double DistBase(Vec3d B1,Vec3d aB2);
@@ -78,6 +79,7 @@ class cFilterTrip
         double FindQuantile(std::vector<double>& v,double p);
 
         bool ONLY_PREDICTION;
+        int  FILTER_MODE;
 };
 
 #endif //_TRI_UTILS

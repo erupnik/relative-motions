@@ -704,7 +704,11 @@ bool cResidualError::operator()(const T* const aW,
     Residual[1] = (yPi - mPtBundle(1))*mFoc /mPdsSqrt;
    
    
-    //std::cout << "************ " << Residual[0] << "\n" << Residual[1] << "\n";
+    /*std::cout << "************ " << Residual[0] << " " << Residual[1] << "\n";
+    std::cout << mPtBundle[0]*726.287+354.64968 << " " << mPtBundle[1]*726.287+186.4656 << "\n";
+    std::cout << xPi*726.287+354.64968 << " " << yPi*726.287+186.4656 
+              << ", 3D=" << aPt3d[0] << " " << aPt3d[1] << " " << aPt3d[2] << "\n";
+    getchar();*/
 /*
     T xpred = (xPi * 5652.66392) + 2614.60004014115202;
     T ypred = (yPi * 5652.66392) + 1886.05247082382 ;

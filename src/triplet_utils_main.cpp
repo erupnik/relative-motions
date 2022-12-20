@@ -12,7 +12,7 @@ DEFINE_string(global_poses_file,
 DEFINE_string(output_poses_file,
               "output_poses.txt",
               "Output file with inlier (inlier_out_poses.txt) or outlier poses (outlier_out_poses.txt) or all of it output_poses.txt");
-DEFINE_bool(filter,
+DEFINE_int32(filter,
               false,
               "Filter relative motions");
 DEFINE_bool(do_only_predict,
@@ -45,6 +45,7 @@ int main(int argc,char** argv)
     cFilterTrip filter(FLAGS_views_file,
                        FLAGS_similarities_file,
                        FLAGS_do_only_predict,
+                       FLAGS_filter,
                        FLAGS_output_poses_file,
                        FLAGS_global_poses_file,
                        FLAGS_filtered_view_file);

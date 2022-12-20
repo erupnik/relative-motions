@@ -650,7 +650,7 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
       return false;
     }
  
-    std::cout << views_name << " " << aNbPts << "\n";
+    //std::cout << views_name << " " << aNbPts << "\n";
  
     // get points 3D
     std::vector<double*>* aFeat3d = mFeat3dMap[views_name];
@@ -675,7 +675,8 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
         param_bloc_CRP.push_back(aC);
         param_bloc_CRP.push_back(aW);
     }
- 
+
+    int num_im_obs=0;
     for (int aCam=0; aCam<NbCam; aCam++)
     {
         //get EO
@@ -684,10 +685,10 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
         Mat3d   aR0 = views->View(aCam).R();
         double*  aW = views->View(aCam).Omega();
  
-        double PdsAtten = CostAttenuate(aNbPts,10);
+        double PdsAtten = CostAttenuate(aNbPts,m_lba_opts._NB_LIAIS);
 
         //residuals on features
-        std::cout << "features nb=" << aNbPts << " " << PdsAtten << "\n";
+        //std::cout << "****CAM" << aCam << " features nb=" << aNbPts << " " << PdsAtten << "\n";
         for (int aK=0; aK<aNbPts; aK++)
         {
             //residuals on features
@@ -700,7 +701,9 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
                                         m_lba_opts._FOCAL);
                 double res_non_pond =0;
                 eval(aW, aC, aFeat3d->at(aK),&res_non_pond);
-                if (res_non_pond*m_lba_opts._FOCAL <3)
+                //if (res_non_pond*m_lba_opts._FOCAL <3)
+
+                if (res_non_pond<m_lba_opts._MAX_ERR)//viabon and PVA with "3"
                 {
                     //std::cout << "==>" << res_non_pond*5560 << " " ;
                  
@@ -708,12 +711,18 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
                                                                     aFeat2d->at(aK).at(aCam),
                                                                     PdsAtten,
                                                                     //m_lba_opts._FEAT_PDS,
+                                                                    //m_lba_opts._FOCAL); rounding errors lead to
+                                                                    //negative eigenvalues 
                                                                     1.0);
                     LossFunction * aLossF = new HuberLoss(m_lba_opts._HUBER);
                     aProblem->AddResidualBlock(aCostF,aLossF,
                                                aW, aC, aFeat3d->at(aK));
+
+                    num_im_obs++;
                     
                 }
+               // else
+                //    std::cout << "PONDDD ERR=" << res_non_pond << "\n";
                 //res_bloc_id.push_back(res_PC_id);
                 //if (aCam==0) //add the 3D points only once
                 //  param_bloc_CRP.push_back(aFeat3d->at(aK));
@@ -721,7 +730,8 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
             
             
         }  
- 
+
+
         // "rappel" on the poses
         if (_GAUGE_RAPPEL_POSES)
         {
@@ -741,7 +751,14 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
         }
  
     }
-
+    //std::cout << "PONDERATION inlier/all=" << double(num_im_obs)/(aNbPts*3)*100.0 << "\n";
+    
+    // check that there is a min number of image observations 
+    if (num_im_obs < m_lba_opts._MIN_NUM_OBS)
+    {
+        VLOG(1) << "Not enough image observations in " << views_name << "\n" ;
+        return false;
+    }
 
     // define between which parameters the covs should be computed 
     for (int aCam0=0; aCam0<NbCam; aCam0++)
@@ -873,6 +890,9 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
     Eigen::SparseMatrix<double> CovMat_inv = solver.solve(I);
     MapJacToEigMat(CovMat_inv,HMat,0);
 
+    //make symmetric again, otherwise negative eigenvalues 
+    //MatXd HMatSym = 0.5* (HMat + HMat.transpose());
+
 
     //get the residuals (vector B) 
     double cost=aSummary.final_cost;//
@@ -895,7 +915,7 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
 
     //add 1 to avois div by 0
     res_total += 1.0;
-    std::cout << "\ntotal res=" << res_total << "\n";
+    //std::cout << "\ntotal res=" << res_total << "\n";
     //res_total *= m_lba_opts._FOCAL; 
 
     views->TotalRes() =  1.0;//aNbPts/res_total; //res_total/aNbPts res 0.69
@@ -907,6 +927,10 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
 
     //store  hessian and vector B 
     views->Hg_() = *(new cHessianGradientX(HMat,my_vect_poses));
+
+    //std::cout << "HMat\n" << HMat << "\n";
+    //std::cout << "HMatSym\n" << HMatSym << "\n";  
+    //getchar();
 
     //decompose the quadratic form into a sum of linear terms 
     views->decompose_H();
@@ -1134,7 +1158,7 @@ bool cAppCovInMotion::OptimizeRelMotions()
     std::cout << "Local view optimization\n";
 
     
-    std::vector<std::string> views_to_del_by_key;
+    //std::vector<std::string> views_to_del_by_key;
 
     //#pragma omp parallel num_threads(1) 
     #pragma omp parallel num_threads(m_lba_opts._PROC_COUNT) 
@@ -1147,8 +1171,14 @@ bool cAppCovInMotion::OptimizeRelMotions()
 
             if (m_lba_opts._RUN_PROP)
             {
+                //std::cout << (*vi_it).first << "\n";
                 if (! BuildProblem_((*vi_it).second,(*vi_it).first))
-                    views_to_del_by_key.push_back((*vi_it).first);
+                {
+                    (*vi_it).second->SetOutlier();
+                    std::cout << "ELIMINATED!" << "\n";
+                    //views_to_del_by_key.push_back((*vi_it).first);
+                }
+
             }
             else 
                 InitCovariances((*vi_it).second,(*vi_it).first);
@@ -1156,13 +1186,52 @@ bool cAppCovInMotion::OptimizeRelMotions()
 
     }
 
-    //delete views with no features or views with rank deficient jacobians  
+    //count eliminated triplets 
+    int NbTripElim=0;
+    for(auto vi : mTriSet->mAllViewMap) 
     {
-    std::cout << " # " << views_to_del_by_key.size() << " view removed\n";
-    for (auto vi : views_to_del_by_key)
-        mTriSet->mAllViewMap.erase(vi);
+        if (! (vi.second)->IsInlier())
+            NbTripElim++;
     }
+    std::cout << "Nb eliminated triplets: " << NbTripElim << "\n"; 
+    //delete views with no features or views with rank deficient jacobians  
+    //std::cout << " # " << views_to_del_by_key.size() << " view removed\n";
+    /*{
 
+    //for (auto vi : views_to_del_by_key)
+    for (int vi=0; vi<int(views_to_del_by_key.size()); vi++)
+    {
+        std::cout << "-vi " << (views_to_del_by_key[vi]) ;
+        std::map<std::string, cNviewPoseX*>::iterator itr = mTriSet->mAllViewMap.find(views_to_del_by_key[vi]);
+        std::cout << "- " << itr->first << "\n" ;
+        if (itr != mTriSet->mAllViewMap.end())
+        {
+        //   delete itr->second;
+           mTriSet->mAllViewMap.erase(itr);
+           //mTriSet->mAllViewMap.erase(vi);
+           std::cout << "+\n";
+        }
+        else
+           std::cout << "not found \n";
+
+    }
+    
+
+    }*/
+
+/*
+ * std::map<std::string, Texture*>::iterator itr = textureMap.find("some/path.png");
+   if (itr != textureMap.end())
+   {
+    // found it - delete it
+    delete itr->second;
+    textureMap.erase(itr);
+   }
+ *
+ *
+ * */
+
+    std::cout << "***************\n";
 
     // save local covariances to file if requested 
     if (m_lba_opts._WRITE_COV)
@@ -1193,128 +1262,130 @@ bool cAppCovInMotion::OptimizeRelMotionsGloballyAllViewsWithDecomp()
     //add equation for each view and camera 
     for(auto view_i : mTriSet->mAllViewMap)
     {
-        std::cout << view_i.first << "\n";
-
-        //similitude
-        Mat3d alpha0 = view_i.second->alpha0();
-        //double* Walpha = view_i.second->Walpha();
-        //double* beta  = view_i.second->beta();
-        //double* lambda = view_i.second->lambda();
-        double* alpha_beta_l = view_i.second->alpha_beta_l();
-
-        int NbCam = (&(view_i.second->View(2))==NULL) ? 2 : 3;
-
-        //collect unknowns 
-        std::vector<double*>  cVec; //relative center (only for basic adj) 
-        std::vector<Mat3d>    rVec; //relative rotations 
-        std::vector<Mat3d>    RVec; //global rotations 
-        
-
-        for (int aCam=0; aCam<NbCam; aCam++)
+        if (view_i.second->IsInlier())
         {
-            //local pose 
-            rVec.push_back(view_i.second->View(aCam).R());
-            cVec.push_back(view_i.second->View(aCam).C());
-
-
-            //initial global pose
-            cPose*& pose = mTriSet->Pose(view_i.second->View(aCam).Name());
-
-            //parameters / constants  
-            RVec.push_back(pose->R());
-          
-        }
-
-        //covariance 
-        VecXd Wi = view_i.second->Wi();
-        MatXd Li = view_i.second->Li();
-        VecXd Cstei = view_i.second->Cstei();
-
-        double total_res = view_i.second->TotalRes();
-
-
-        cPose*& pose0 = mTriSet->Pose(view_i.second->View(0).Name());
-        cPose*& pose1 = mTriSet->Pose(view_i.second->View(1).Name());
-        
-        double * C0 = pose0->C();
-        double * W0 = pose0->Omega();
-        
-        double * C1 = pose1->C();
-        double * W1 = pose1->Omega();
-
-        if (NbCam==2)
-        {
-            if (m_gba_opts._PROPAGATE)
-            {
-                /* Unknown poses, constant similarity */ 
-                /*CostFunction * aCost = cResidualOn2ViewsPoseDecomp::Create(alpha0,beta,lambda,
-                                                      rVec,RVec,
-                                                      Wi,Li,Cstei) ;
-                aProblem->AddResidualBlock(aCost,NULL,
-                                     C0,W0,C1,W1);*/
-             
-                CostFunction * aCost = cResidualOn2ViewsPoseDecompLAB::Create(alpha0,
-                                                      rVec,RVec,
-                                                      Wi,Li,Cstei,total_res) ;
-          
-                LossFunction * aLoss = NULL; //new HuberLoss(m_gba_opts._HUBER_S);
-
-                aProblem->AddResidualBlock(aCost,aLoss,
-                                     C0,W0,C1,W1,alpha_beta_l);
-                }
-            else
-            {
-                CostFunction* Cost = cResidualOn3ViewsPoseBasicLAB::Create(alpha0,cVec,rVec,RVec);
-                LossFunction * Loss = NULL;
-                aProblem->AddResidualBlock(Cost,Loss,C0,W0,C1,W1,alpha_beta_l);
-                                                                           
-            }
-        }
-
-
-        if (NbCam==3)
-        {
+            //std::cout << view_i.first << "\n";
+         
+            //similitude
+            Mat3d alpha0 = view_i.second->alpha0();
+            //double* Walpha = view_i.second->Walpha();
+            //double* beta  = view_i.second->beta();
+            //double* lambda = view_i.second->lambda();
+            double* alpha_beta_l = view_i.second->alpha_beta_l();
+         
+            int NbCam = (&(view_i.second->View(2))==NULL) ? 2 : 3;
+         
+            //collect unknowns 
+            std::vector<double*>  cVec; //relative center (only for basic adj) 
+            std::vector<Mat3d>    rVec; //relative rotations 
+            std::vector<Mat3d>    RVec; //global rotations 
             
-            cPose*& pose2 = mTriSet->Pose(view_i.second->View(2).Name());
          
-            double * C2 = pose2->C();
-            double * W2 = pose2->Omega();
-        
-            if (m_gba_opts._PROPAGATE)
+            for (int aCam=0; aCam<NbCam; aCam++)
             {
-                /* Unknown poses, constant similarity */ 
-                /*Vec3d beta {alpha_beta_l[3],alpha_beta_l[4],alpha_beta_l[5]};
-                double L = alpha_beta_l[6];
-                CostFunction * aCost = cResidualOn3ViewsPoseDecomp::Create(alpha0,beta,L,
-                                                      rVec,RVec,
-                                                      Wi,Li,Cstei) ;
-                aProblem->AddResidualBlock(aCost,NULL,
-                                     C0,W0,C1,W1,C2,W2); */
-          
-                CostFunction * aCost = cResidualOn3ViewsPoseDecompLAB::Create(alpha0,
-                                                      rVec,RVec,
-                                                      Wi,Li,Cstei,
-                                                      total_res) ; 
-          
-                LossFunction * aLoss = NULL; //new HuberLoss(m_gba_opts._HUBER_S);
-                aProblem->AddResidualBlock(aCost,aLoss,
-                                     C0,W0,C1,W1,C2,W2,alpha_beta_l);
-            }
-            else
-            {
-                CostFunction* Cost = cResidualOn3ViewsPoseBasicLAB::Create(alpha0,cVec,rVec,RVec);
-                LossFunction * Loss = NULL;
-                aProblem->AddResidualBlock(Cost,Loss,C0,W0,C1,W1,C2,W2,alpha_beta_l);
-
+                //local pose 
+                rVec.push_back(view_i.second->View(aCam).R());
+                cVec.push_back(view_i.second->View(aCam).C());
+         
+         
+                //initial global pose
+                cPose*& pose = mTriSet->Pose(view_i.second->View(aCam).Name());
+         
+                //parameters / constants  
+                RVec.push_back(pose->R());
+              
             }
          
+            //covariance 
+            VecXd Wi = view_i.second->Wi();
+            MatXd Li = view_i.second->Li();
+            VecXd Cstei = view_i.second->Cstei();
+         
+            double total_res = view_i.second->TotalRes();
+         
+         
+            cPose*& pose0 = mTriSet->Pose(view_i.second->View(0).Name());
+            cPose*& pose1 = mTriSet->Pose(view_i.second->View(1).Name());
+            
+            double * C0 = pose0->C();
+            double * W0 = pose0->Omega();
+            
+            double * C1 = pose1->C();
+            double * W1 = pose1->Omega();
+         
+            if (NbCam==2)
+            {
+                if (m_gba_opts._PROPAGATE)
+                {
+                    /* Unknown poses, constant similarity */ 
+                    /*CostFunction * aCost = cResidualOn2ViewsPoseDecomp::Create(alpha0,beta,lambda,
+                                                          rVec,RVec,
+                                                          Wi,Li,Cstei) ;
+                    aProblem->AddResidualBlock(aCost,NULL,
+                                         C0,W0,C1,W1);*/
+                 
+                    CostFunction * aCost = cResidualOn2ViewsPoseDecompLAB::Create(alpha0,
+                                                          rVec,RVec,
+                                                          Wi,Li,Cstei,total_res) ;
+              
+                    LossFunction * aLoss = NULL; //new HuberLoss(m_gba_opts._HUBER_S);
+         
+                    aProblem->AddResidualBlock(aCost,aLoss,
+                                         C0,W0,C1,W1,alpha_beta_l);
+                    }
+                else
+                {
+                    CostFunction* Cost = cResidualOn3ViewsPoseBasicLAB::Create(alpha0,cVec,rVec,RVec);
+                    LossFunction * Loss = NULL;
+                    aProblem->AddResidualBlock(Cost,Loss,C0,W0,C1,W1,alpha_beta_l);
+                                                                               
+                }
+            }
+         
+         
+            if (NbCam==3)
+            {
+                
+                cPose*& pose2 = mTriSet->Pose(view_i.second->View(2).Name());
+             
+                double * C2 = pose2->C();
+                double * W2 = pose2->Omega();
+            
+                if (m_gba_opts._PROPAGATE)
+                {
+                    /* Unknown poses, constant similarity */ 
+                    /*Vec3d beta {alpha_beta_l[3],alpha_beta_l[4],alpha_beta_l[5]};
+                    double L = alpha_beta_l[6];
+                    CostFunction * aCost = cResidualOn3ViewsPoseDecomp::Create(alpha0,beta,L,
+                                                          rVec,RVec,
+                                                          Wi,Li,Cstei) ;
+                    aProblem->AddResidualBlock(aCost,NULL,
+                                         C0,W0,C1,W1,C2,W2); */
+              
+                    CostFunction * aCost = cResidualOn3ViewsPoseDecompLAB::Create(alpha0,
+                                                          rVec,RVec,
+                                                          Wi,Li,Cstei,
+                                                          total_res) ; 
+              
+                    LossFunction * aLoss = NULL; //new HuberLoss(m_gba_opts._HUBER_S);
+                    aProblem->AddResidualBlock(aCost,aLoss,
+                                         C0,W0,C1,W1,C2,W2,alpha_beta_l);
+                }
+                else
+                {
+                    CostFunction* Cost = cResidualOn3ViewsPoseBasicLAB::Create(alpha0,cVec,rVec,RVec);
+                    LossFunction * Loss = NULL;
+                    aProblem->AddResidualBlock(Cost,Loss,C0,W0,C1,W1,C2,W2,alpha_beta_l);
+         
+                }
+             
+               
+            }
            
-        }
-       
-        for (int aCam=0; aCam<NbCam; aCam++)
-            mTriSet->Pose(view_i.second->View(aCam).Name())->SetRefined();
+            for (int aCam=0; aCam<NbCam; aCam++)
+                mTriSet->Pose(view_i.second->View(aCam).Name())->SetRefined();
 
-        
+        }
     }
 
     //add constraint on initial global poses 
@@ -1353,10 +1424,13 @@ bool cAppCovInMotion::OptimizeRelMotionsGloballyAllViewsWithDecomp()
     // The 3d similarity come before the cameras.
     for(auto view_i : mTriSet->mAllViewMap)
     {
-        //similitude
-        double* alpha_beta_l = view_i.second->alpha_beta_l();
-
-        ordering->AddElementToGroup(alpha_beta_l, 0);
+        if (view_i.second->IsInlier())
+        {
+            //similitude
+            double* alpha_beta_l = view_i.second->alpha_beta_l();
+         
+            ordering->AddElementToGroup(alpha_beta_l, 0);
+        }
     }
     for (auto pose_i : mTriSet->mGlobalPoses)
     {

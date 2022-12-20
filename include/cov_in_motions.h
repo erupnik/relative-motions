@@ -308,6 +308,7 @@ class cNviewPoseX
     bool Init() {return _INIT;}
     void SetInit() {_INIT=true;}
     void SetOutlier() {_FLAG_OUTLIER=true;}
+    bool IsInlier() {return _FLAG_OUTLIER ? false : true;}
     void Show() {mView1->Show(); mView21->Show(); if (mNbV==3) mView31->Show();}
 
 

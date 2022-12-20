@@ -45,6 +45,8 @@ int main(int argc,char** argv)
             ("lba_R_pds", po::value<double>(), "local BA: rotation PDS")
             ("lba_C_pds", po::value<double>(), "local BA: center PDS")
             ("lba_loss_fea", po::value<double>(), "local BA: Huber loss threshold for features")
+            ("lba_max_err", po::value<double>(), "local BA: Reprojection error threshold for features")
+            ("lba_nb_liais", po::value<double>(), "local BA: Weighting that limits the no of feature obs, def=10")
             ("lba_write_cov", po::value<bool>(), "local BA: covariance propagation ON/OFF")
             ("lba_nb_proc", po::value<int>(), "local BA: number of cores")
             ("gba_R_pds", po::value<double>(), "global BA: rotation PDS")
@@ -125,6 +127,12 @@ int main(int argc,char** argv)
 
         if (vmap.count("lba_loss_fea")) 
             lba_opts._HUBER = vmap["lba_loss_fea"].as<double>() ;
+
+        if (vmap.count("lba_max_err"))
+            lba_opts._MAX_ERR = vmap["lba_max_err"].as<double>() ;
+
+        if (vmap.count("lba_nb_liais"))
+            lba_opts._NB_LIAIS = vmap["lba_nb_liais"].as<double>() ;
 
         if (vmap.count("lba_write_cov"))
         {
