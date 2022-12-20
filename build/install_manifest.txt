@@ -1,0 +1,2 @@
+/home/er/Documents/d_dev/structureless/propcov/relative-motions/bin/cov_in_motions
+/home/er/Documents/d_dev/structureless/propcov/relative-motions/bin/triplet_utils

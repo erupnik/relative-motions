@@ -1,0 +1,4 @@
+Log file created at: 2022/11/28 17:36:56
+Running on machine: er
+Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg
+I1128 17:36:56.393235 1214869 triplet_utils_main.cpp:33] triplet_utils --views_file= --similarities_file= --global_poses_file= --output_poses_file=output_poses.txt --filter=0 --filtered_file=EGs_filtered.txt --do_only_predict=0
