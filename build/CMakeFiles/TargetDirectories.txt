@@ -1,8 +1,0 @@
-/home/er/Documents/d_dev/structureless/propcov/relative-motions/build/CMakeFiles/install/strip.dir
-/home/er/Documents/d_dev/structureless/propcov/relative-motions/build/CMakeFiles/install/local.dir
-/home/er/Documents/d_dev/structureless/propcov/relative-motions/build/CMakeFiles/install.dir
-/home/er/Documents/d_dev/structureless/propcov/relative-motions/build/CMakeFiles/list_install_components.dir
-/home/er/Documents/d_dev/structureless/propcov/relative-motions/build/CMakeFiles/rebuild_cache.dir
-/home/er/Documents/d_dev/structureless/propcov/relative-motions/build/CMakeFiles/edit_cache.dir
-/home/er/Documents/d_dev/structureless/propcov/relative-motions/build/CMakeFiles/triplet_utils.dir
-/home/er/Documents/d_dev/structureless/propcov/relative-motions/build/CMakeFiles/cov_in_motions.dir
