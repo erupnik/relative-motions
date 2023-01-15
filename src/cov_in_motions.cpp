@@ -334,6 +334,14 @@ void cNviewPoseX::decompose_H()
    mLi = es.eigenvectors().transpose() ;
    mWi = es.eigenvalues();
    mCstei = mLi * Sol;
+
+   //zero-out negative eigenvalues 
+   //(sometimes due to numerical instability values can be neg)
+   if (mWi[0] < 0)
+   {
+       mWi[0]=0.0;
+       VLOG(1) << "=== Zero-out negative eigenvalue " << mWi[0] << "\n" ;
+   }
 /*
 SelfAdjointEigenSolver<Matrix4f> es;
 Matrix4f X = Matrix4f::Random(4,4);
@@ -344,12 +352,12 @@ es.compute(A + Matrix4f::Identity(4,4)); // re-use es to compute eigenvalues of 
 cout << "The eigenvalues of A+I are: " << es.eigenvalues().transpose() << endl;
 */
 
-
-/*   std::cout << "mH\n" <<  H << "\n";
+/*
+   std::cout << "mH\n" <<  H << "\n";
     std::cout << "mLi\n" <<  mLi << "\n";
     std::cout << "mW\n" << mWi  << "\n";
     std::cout << "Cstei\n" <<  mCstei << "\n";
-getchar();*/ 
+getchar(); */
    
 }
 
@@ -1332,10 +1340,12 @@ bool cAppCovInMotion::OptimizeRelMotionsGloballyAllViewsWithDecomp()
          
                     aProblem->AddResidualBlock(aCost,aLoss,
                                          C0,W0,C1,W1,alpha_beta_l);
-                    }
+                }
                 else
                 {
-                    CostFunction* Cost = cResidualOn3ViewsPoseBasicLAB::Create(alpha0,cVec,rVec,RVec);
+                    CostFunction* Cost = cResidualOn3ViewsPoseBasicLAB::Create(alpha0,cVec,rVec,RVec,
+                                                                                m_gba_opts._C_PDS,
+                                                                                m_gba_opts._ROT_PDS);
                     LossFunction * Loss = NULL;
                     aProblem->AddResidualBlock(Cost,Loss,C0,W0,C1,W1,alpha_beta_l);
                                                                                
@@ -1373,7 +1383,9 @@ bool cAppCovInMotion::OptimizeRelMotionsGloballyAllViewsWithDecomp()
                 }
                 else
                 {
-                    CostFunction* Cost = cResidualOn3ViewsPoseBasicLAB::Create(alpha0,cVec,rVec,RVec);
+                    CostFunction* Cost = cResidualOn3ViewsPoseBasicLAB::Create(alpha0,cVec,rVec,RVec,
+                                                                              m_gba_opts._C_PDS,
+                                                                              m_gba_opts._ROT_PDS);
                     LossFunction * Loss = NULL;
                     aProblem->AddResidualBlock(Cost,Loss,C0,W0,C1,W1,C2,W2,alpha_beta_l);
          
@@ -1389,30 +1401,31 @@ bool cAppCovInMotion::OptimizeRelMotionsGloballyAllViewsWithDecomp()
     }
 
     //add constraint on initial global poses 
-/*
-    for (auto pose_i : mTriSet->mGlobalPoses)
+    if (m_gba_opts._CONSTRAIN_GPOSE)
     {
-        if (pose_i.second->IsRefined())
+        for (auto pose_i : mTriSet->mGlobalPoses)
         {
-            //parameters 
-            double* C = pose_i.second->C();
-            double* C_immutable = pose_i.second->C_immutable();
-            double* W = pose_i.second->Omega();
-            double* W_immutable = pose_i.second->Omega_immutable();
-        
-            //LossFunction * aLossW = new HuberLoss(m_gba_opts._HUBER_P);
-            //LossFunction * aLossC = new HuberLoss(m_gba_opts._HUBER_P);
+            if (pose_i.second->IsRefined())
+            {
+                //parameters 
+                double* C = pose_i.second->C();
+                double* C_immutable = pose_i.second->C_immutable();
+                double* W = pose_i.second->Omega();
+                double* W_immutable = pose_i.second->Omega_immutable();
             
-            //perspective center
-            CostFunction * CostC = cPoseConstraint::Create(C_immutable,m_gba_opts._C_PDS);
-            ceres::ResidualBlockId res_C_id = aProblem->AddResidualBlock(CostC,NULL,(C));
-
-            //small rotation
-            CostFunction * CostR = cPoseConstraint::Create(W_immutable,m_gba_opts._ROT_PDS);
-            ceres::ResidualBlockId res_W_id = aProblem->AddResidualBlock(CostR,NULL,(W));
+                //LossFunction * aLossW = new HuberLoss(m_gba_opts._HUBER_P);
+                //LossFunction * aLossC = new HuberLoss(m_gba_opts._HUBER_P);
+                
+                //perspective center
+                CostFunction * CostC = cPoseConstraint::Create(C_immutable,m_gba_opts._C_PDS);
+                ceres::ResidualBlockId res_C_id = aProblem->AddResidualBlock(CostC,NULL,(C));
+ 
+                //small rotation
+                CostFunction * CostR = cPoseConstraint::Create(W_immutable,m_gba_opts._ROT_PDS);
+                ceres::ResidualBlockId res_W_id = aProblem->AddResidualBlock(CostR,NULL,(W));
+            }
         }
     }
-*/
     
     //solve the least squares problem
     ceres::Solver::Options Opts;
@@ -1765,7 +1778,7 @@ cAppCovInMotion::cAppCovInMotion(const InputFiles& inputs,
             mTriSet->WriteGlobalPFromRelPAndSim("pose_predictions.txt");
  
         /* Get covariances per motion */
-        if (m_gba_opts._PROPAGATE)
+        if (m_lba_opts._RUN_PROP)
             OptimizeRelMotions();
  
         /* Run global bundle adjustment using "relative" covariances */

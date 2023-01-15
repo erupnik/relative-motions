@@ -10,6 +10,9 @@ struct GlobalBundleOptions
         // if true do propgation, otherwise basic adjustment
         bool _PROPAGATE=true;
 
+	// apply soft constrain on initial global poses
+        bool _CONSTRAIN_GPOSE = false;
+
         // square root PDS for rotations
         double _ROT_PDS=0.01 ;
 
@@ -69,7 +72,7 @@ struct LocalBundleOptions
         double _NB_LIAIS=10.0;
 
         // minimum number of image observations 
-        int _MIN_NUM_OBS=60; //=3*50
+        int _MIN_NUM_OBS=30; //=3*50
 
         // maximum Hessian trace value, 
         // motions above this value are not considered

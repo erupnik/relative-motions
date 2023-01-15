@@ -605,29 +605,29 @@ bool cResidualOn3ViewsPoseBasicLAB::operator()(const T* const C0, const T* const
     //- print residuals to make sure equations are OK
 
 
-    Residual[0]  = m_cV[0][0] - c_wr[0]; 
-    Residual[1]  = m_cV[0][1] - c_wr[1]; 
-    Residual[2]  = m_cV[0][2] - c_wr[2]; 
+    Residual[0]  = (m_cV[0][0] - c_wr[0])/mPdsSqrt_c; 
+    Residual[1]  = (m_cV[0][1] - c_wr[1])/mPdsSqrt_c; 
+    Residual[2]  = (m_cV[0][2] - c_wr[2])/mPdsSqrt_c; 
 
-    Residual[3]  = 0.0 - c_wr[3];
-    Residual[4]  = 0.0 - c_wr[4];
-    Residual[5]  = 0.0 - c_wr[5];
+    Residual[3]  = (0.0 - c_wr[3])/mPdsSqrt_w;
+    Residual[4]  = (0.0 - c_wr[4])/mPdsSqrt_w;
+    Residual[5]  = (0.0 - c_wr[5])/mPdsSqrt_w;
 
-    Residual[6]  = m_cV[1][0] - c_wr[6]; 
-    Residual[7]  = m_cV[1][1] - c_wr[7]; 
-    Residual[8]  = m_cV[1][2] - c_wr[8]; 
+    Residual[6]  = (m_cV[1][0] - c_wr[6])/mPdsSqrt_c; 
+    Residual[7]  = (m_cV[1][1] - c_wr[7])/mPdsSqrt_c;
+    Residual[8]  = (m_cV[1][2] - c_wr[8])/mPdsSqrt_c;
 
-    Residual[9]  = 0.0 - c_wr[9]; 
-    Residual[10] = 0.0 - c_wr[10];
-    Residual[11] = 0.0 - c_wr[11];
+    Residual[9]  = (0.0 - c_wr[9])/mPdsSqrt_w; 
+    Residual[10] = (0.0 - c_wr[10])/mPdsSqrt_w;
+    Residual[11] = (0.0 - c_wr[11])/mPdsSqrt_w;
 
-    Residual[12] = m_cV[2][0] - c_wr[12]; 
-    Residual[13] = m_cV[2][1] - c_wr[13]; 
-    Residual[14] = m_cV[2][2] - c_wr[14]; 
+    Residual[12] = (m_cV[2][0] - c_wr[12])/mPdsSqrt_c;
+    Residual[13] = (m_cV[2][1] - c_wr[13])/mPdsSqrt_c;
+    Residual[14] = (m_cV[2][2] - c_wr[14])/mPdsSqrt_c;
 
-    Residual[15] = 0.0 - c_wr[15];
-    Residual[16] = 0.0 - c_wr[16];
-    Residual[17] = 0.0 - c_wr[17];
+    Residual[15] = (0.0 - c_wr[15])/mPdsSqrt_w;
+    Residual[16] = (0.0 - c_wr[16])/mPdsSqrt_w;
+    Residual[17] = (0.0 - c_wr[17])/mPdsSqrt_w;
 
     /*for (int i=0;i<18; i++)
         std::cout << Residual[i] << " " ;
@@ -642,11 +642,133 @@ bool cResidualOn3ViewsPoseBasicLAB::operator()(const T* const C0, const T* const
 CostFunction* cResidualOn3ViewsPoseBasicLAB::Create( const Mat3d alpha0, 
                                                      const std::vector<double*> cV,
                                                      const std::vector<Mat3d> rV, 
-                                                     const std::vector<Mat3d> R0V)
+                                                     const std::vector<Mat3d> R0V,
+                                                     const double             Pds_c,
+                                                     const double             Pds_w)
 {
 
-    return  (new AutoDiffCostFunction<cResidualOn3ViewsPoseBasicLAB,18,3,3,3,3,3,3,7> (new cResidualOn3ViewsPoseBasicLAB(alpha0,cV,rV,R0V)));
+    return  (new AutoDiffCostFunction<cResidualOn3ViewsPoseBasicLAB,18,3,3,3,3,3,3,7> 
+                  (new cResidualOn3ViewsPoseBasicLAB(alpha0,cV,rV,R0V,Pds_c,Pds_w)));
 }
+
+
+template <typename T>
+bool cResidualOn2ViewsPoseBasicLAB::operator()(const T* const C0, const T* const W0,
+                                               const T* const C1, const T* const W1,
+                                               const T* const alpha_beta_L, T* Residual) const
+{
+    Eigen::Matrix<T,12,1> c_wr;
+
+    const T* const  Wa   = alpha_beta_L;
+    const T* const beta = alpha_beta_L+3;
+    const T* const L    = alpha_beta_L+6;
+
+    // c= Lambda * alpha0 (I+Wa) * C + beta 
+    Eigen::Matrix<T, 3, 3> WaPlusI = Eigen::Matrix<T, 3, 3>::Identity();
+    WaPlusI(0,1) = -Wa[2];
+    WaPlusI(1,0) = Wa[2];
+    WaPlusI(0,2) = Wa[1];
+    WaPlusI(2,0) = -Wa[1];
+    WaPlusI(2,1) = Wa[0];
+    WaPlusI(1,2) = -Wa[0];
+
+    Eigen::Map<const Eigen::Matrix<T, 3, 1> > C0m(C0); 
+    Eigen::Map<const Eigen::Matrix<T, 3, 1> > C1m(C1); 
+    Eigen::Map<const Eigen::Matrix<T, 3, 1> > betam(beta); 
+
+    Eigen::Matrix<T,3,1> c0 = L[0] * m_alpha0 * WaPlusI * C0m + betam;
+    Eigen::Matrix<T,3,1> c1 = L[0] * m_alpha0 * WaPlusI * C1m + betam;
+
+    // Wr = r0_inv * alpha0 (I+Wa)  * R0    (I+WR) -I  
+    //Wr0 
+    Eigen::Matrix<T, 3, 3> WR0plusI =  Eigen::Matrix<T, 3, 3>::Identity();
+    WR0plusI(0,1) = -W0[2];
+    WR0plusI(1,0) = W0[2];
+    WR0plusI(0,2) = W0[1];
+    WR0plusI(2,0) = -W0[1];
+    WR0plusI(2,1) = W0[0];
+    WR0plusI(1,2) = -W0[0];
+
+    Eigen::Matrix<T,3,3> r0_inv = m_rV[0].inverse().cast<T>(); 
+    Eigen::Matrix<T,3,3> R00    = m_R0V[0].cast<T>(); 
+    Eigen::Matrix<T,3,3> wr0 = r0_inv * m_alpha0 * WaPlusI * R00 * WR0plusI - Eigen::Matrix<T, 3, 3>::Identity();
+
+    //Wr1
+    Eigen::Matrix<T, 3, 3> WR1plusI =  Eigen::Matrix<T, 3, 3>::Identity();
+    WR1plusI(0,1) = -W1[2];
+    WR1plusI(1,0) = W1[2];
+    WR1plusI(0,2) = W1[1];
+    WR1plusI(2,0) = -W1[1];
+    WR1plusI(2,1) = W1[0];
+    WR1plusI(1,2) = -W1[0];
+
+    Eigen::Matrix<T,3,3> r1_inv = m_rV[1].inverse().cast<T>(); 
+    Eigen::Matrix<T,3,3> R01    = m_R0V[1].cast<T>(); 
+    Eigen::Matrix<T,3,3> wr1 = r1_inv * m_alpha0 * WaPlusI * R01 * WR1plusI - Eigen::Matrix<T, 3, 3>::Identity();
+
+    
+    //update the c_wr vector 
+    c_wr[0] = c0[0];
+    c_wr[1] = c0[1];
+    c_wr[2] = c0[2];
+    c_wr[3] = wr0(2,1);
+    c_wr[4] = wr0(0,2);
+    c_wr[5] = wr0(1,0);
+
+    c_wr[6] = c1[0];
+    c_wr[7] = c1[1];
+    c_wr[8] = c1[2];
+    c_wr[9] = wr1(2,1);
+    c_wr[10] = wr1(0,2);
+    c_wr[11] = wr1(1,0);
+
+
+    //- check whether the input Wr is the original Wr or the one corrected by the local bundle
+    //if it is the original then Wr = 0 
+    //- print residuals to make sure equations are OK
+
+
+    Residual[0]  = (m_cV[0][0] - c_wr[0])/mPdsSqrt_c; 
+    Residual[1]  = (m_cV[0][1] - c_wr[1])/mPdsSqrt_c; 
+    Residual[2]  = (m_cV[0][2] - c_wr[2])/mPdsSqrt_c; 
+
+    Residual[3]  = (0.0 - c_wr[3])/mPdsSqrt_w;
+    Residual[4]  = (0.0 - c_wr[4])/mPdsSqrt_w;
+    Residual[5]  = (0.0 - c_wr[5])/mPdsSqrt_w;
+
+    Residual[6]  = (m_cV[1][0] - c_wr[6])/mPdsSqrt_c; 
+    Residual[7]  = (m_cV[1][1] - c_wr[7])/mPdsSqrt_c;
+    Residual[8]  = (m_cV[1][2] - c_wr[8])/mPdsSqrt_c;
+
+    Residual[9]  = (0.0 - c_wr[9])/mPdsSqrt_w; 
+    Residual[10] = (0.0 - c_wr[10])/mPdsSqrt_w;
+    Residual[11] = (0.0 - c_wr[11])/mPdsSqrt_w;
+
+
+    /*for (int i=0;i<12; i++)
+        std::cout << Residual[i] << " " ;
+    std::cout << "\n";
+
+    getchar();*/
+
+
+    return true;
+
+}
+CostFunction* cResidualOn2ViewsPoseBasicLAB::Create( const Mat3d alpha0, 
+                                                     const std::vector<double*> cV,
+                                                     const std::vector<Mat3d> rV, 
+                                                     const std::vector<Mat3d> R0V,
+                                                     const double             Pds_c,
+                                                     const double             Pds_w)
+{
+
+    return  (new AutoDiffCostFunction<cResidualOn2ViewsPoseBasicLAB,12,3,3,3,3,7> 
+            (new cResidualOn2ViewsPoseBasicLAB(alpha0,cV,rV,R0V,Pds_c,Pds_w)));
+}
+
+
+
 
 template <typename T>
 bool cResidualError::operator()(const T* const aW,

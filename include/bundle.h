@@ -244,16 +244,22 @@ class cResidualOn2ViewsPoseDecompLAB
         const double m_tot_res;
 };
 
-/* Basic adjustment without covariance propagation 
+/* Triplets: Basic adjustment without covariance propagation 
  * * Wr=0 */
 class cResidualOn3ViewsPoseBasicLAB
 {
     public:
-        cResidualOn3ViewsPoseBasicLAB(const Mat3d alpha0, const std::vector<double*> cV, const std::vector<Mat3d> rV, const std::vector<Mat3d> R0V) :
+        cResidualOn3ViewsPoseBasicLAB(const Mat3d alpha0, 
+                                    const std::vector<double*> cV, 
+                                    const std::vector<Mat3d> rV, 
+                                    const std::vector<Mat3d> R0V,
+                                    const double Pds_c,const double Pds_w) :
                                   m_alpha0(alpha0),
                                   m_cV(cV),
                                   m_rV(rV),
-                                  m_R0V(R0V){}
+                                  m_R0V(R0V),
+                                  mPdsSqrt_c(Pds_c),
+                                  mPdsSqrt_w(Pds_w){}
 
         ~cResidualOn3ViewsPoseBasicLAB(){}
 
@@ -266,7 +272,9 @@ class cResidualOn3ViewsPoseBasicLAB
         static CostFunction* Create(const Mat3d alpha0, 
                                     const std::vector<double*> c0V,
                                     const std::vector<Mat3d> r0V, 
-                                    const std::vector<Mat3d> R0V);
+                                    const std::vector<Mat3d> R0V,
+                                    const double             Pds_c,
+                                    const double             Pds_w);
 
 
     private:
@@ -275,6 +283,54 @@ class cResidualOn3ViewsPoseBasicLAB
         const std::vector<double*> m_cV;
         const std::vector<Mat3d> m_rV;
         const std::vector<Mat3d> m_R0V;
+        
+        const double mPdsSqrt_c;
+        const double mPdsSqrt_w;
+
+   
+};
+
+/* Pairs: Basic adjustment without covariance propagation 
+ * * Wr=0 */
+class cResidualOn2ViewsPoseBasicLAB
+{
+    public:
+        cResidualOn2ViewsPoseBasicLAB(const Mat3d alpha0, 
+                                    const std::vector<double*> cV, 
+                                    const std::vector<Mat3d> rV, 
+                                    const std::vector<Mat3d> R0V,
+                                    const double Pds_c,const double Pds_w) :
+                                  m_alpha0(alpha0),
+                                  m_cV(cV),
+                                  m_rV(rV),
+                                  m_R0V(R0V),
+                                  mPdsSqrt_c(Pds_c),
+                                  mPdsSqrt_w(Pds_w){}
+
+        ~cResidualOn2ViewsPoseBasicLAB(){}
+
+        template <typename T>
+            bool operator()(const T* const C0, const T* const W0,
+                            const T* const C1, const T* const W1,
+                            const T* const alpha_beta_L, T* Residual) const;
+                                
+        static CostFunction* Create(const Mat3d alpha0, 
+                                    const std::vector<double*> c0V,
+                                    const std::vector<Mat3d> r0V, 
+                                    const std::vector<Mat3d> R0V,
+                                    const double             Pds_c,
+                                    const double             Pds_w);
+
+
+    private:
+        /* Constants */
+        const Mat3d m_alpha0;
+        const std::vector<double*> m_cV;
+        const std::vector<Mat3d> m_rV;
+        const std::vector<Mat3d> m_R0V;
+        
+        const double mPdsSqrt_c;
+        const double mPdsSqrt_w;
 
    
 };
