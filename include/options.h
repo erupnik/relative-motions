@@ -10,8 +10,14 @@ struct GlobalBundleOptions
         // if true do propgation, otherwise basic adjustment
         bool _PROPAGATE=true;
 
-	// apply soft constrain on initial global poses
+	    // apply soft constrain on initial global poses
         bool _CONSTRAIN_GPOSE = false;
+
+	    // apply soft constrain on current global poses
+        bool _CONSTRAIN_GPOSE_CUR = false;
+
+        // apply IRLS (iterative reweighted least squares)
+        bool _IRLS = true;
 
         // square root PDS for rotations
         double _ROT_PDS=0.01 ;
@@ -30,8 +36,31 @@ struct GlobalBundleOptions
         //use inner iterations
         bool _INNER_ITER=false;
 
+        //max number of iterations 
+        int  _NB_MAX_ITER=30;
+
         //number of cores 
         int _PROC_COUNT=std::thread::hardware_concurrency();
+
+        //monitor solver evolution 
+        bool _MONITOR_SOLVER_EVOL=false;
+
+	    void Show() {
+	          std::cout << "==============\n"
+	          << "GlobalBundleOptions:\n"
+		      << "_PROPAGATE=" << _PROPAGATE << "\n"
+		      << "_CONSTRAIN_GPOSE=" << _CONSTRAIN_GPOSE << "\n"
+		      << "_CONSTRAIN_GPOSE_CUR=" << _CONSTRAIN_GPOSE_CUR << "\n"
+		      << "_IRLS=" << _IRLS << "\n"
+		      << "_ROT_PDS=" << _ROT_PDS << "\n"
+		      << "_C_PDS=" << _C_PDS << "\n"
+		      << "_HUBER_S=" << _HUBER_S << "\n"
+		      << "_HUBER_P=" << _HUBER_P << "\n"
+		      << "_INNER_ITER=" << _INNER_ITER << "\n"
+		      << "_NB_MAX_ITER=" << _NB_MAX_ITER << "\n"
+		      << "_MONITOR_SOLVER_EVOL=" << _MONITOR_SOLVER_EVOL << "\n"
+		      ;
+	};
 
     private:
 };
@@ -92,6 +121,24 @@ struct LocalBundleOptions
    
         //focal in pixels 
         double _FOCAL = 1;
+
+
+	    void Show() {
+                      std::cout << "==============\n"
+                      << "LocalBundleOptions:\n"
+                      << "_RUN_PROP=" << _RUN_PROP << "\n"
+                      << "_FEAT_PDS=" << _FEAT_PDS << "\n"
+                      << "_ROT_PDS=" << _ROT_PDS << "\n"
+                      << "_C_PDS=" << _C_PDS << "\n"
+                      << "_HUBER=" << _HUBER << "\n"
+                      << "_MAX_ERR=" << _MAX_ERR << "\n"
+                      << "_MIN_NUM_OBS=" << _MIN_NUM_OBS << "\n"
+                      << "_NB_LIAIS=" << _NB_LIAIS << "\n"
+                      << "_TRACE_H=" << _TRACE_H << "\n"
+                      << "_WRITE_COV=" << _WRITE_COV << "\n"
+                      << "_FOCAL=" << _FOCAL << "\n"
+                      ;
+        };
 
     private:
 

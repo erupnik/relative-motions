@@ -340,7 +340,16 @@ void cNviewPoseX::decompose_H()
    if (mWi[0] < 0)
    {
        mWi[0]=0.0;
-       VLOG(1) << "=== Zero-out negative eigenvalue " << mWi[0] << "\n" ;
+
+       for (int i=1; i<NbEl; i++)
+       {
+           if (mWi[i] < 0)
+           {
+               VLOG(1) << "=== Zero-out negative eigenvalue " << mWi[i] << "\n" ;
+               mWi[i] = 0.0;
+           } 
+
+       }
    }
 /*
 SelfAdjointEigenSolver<Matrix4f> es;
@@ -579,34 +588,58 @@ void cAppCovInMotion::PrintAllPts3d()
 
 void cAppCovInMotion::WriteLocalCovs()
 {
+    //save the hessian and the decomposed eigenvectors/values
     for(auto vi : mTriSet->mAllViewMap) 
     {
         std::string view_name = vi.first;
 
         //save covariance diagonal
-        std::string covR_file_name = "covR" + m_lba_opts._KEY + ".txt";
+        /*std::string covR_file_name = "covR" + m_lba_opts._KEY + ".txt";
         std::fstream covR_file;
         covR_file.open(covR_file_name.c_str(), std::ios_base::app);
         std::string covC_file_name = "covC" + m_lba_opts._KEY + ".txt";
         std::fstream covC_file;
-        covC_file.open(covC_file_name.c_str(), std::ios_base::app);
+        covC_file.open(covC_file_name.c_str(), std::ios_base::app);*/
        
-       
-        covR_file << vi.second->NbView() << " "; 
-        covC_file << vi.second->NbView() << " "; 
+        std::string hess_file_name = "hess" + m_lba_opts._KEY + ".txt";
+        std::fstream hess_file;
+        hess_file.open(hess_file_name.c_str(), std::ios_base::app);
+
+        std::string eigen_file_name = "eigen" + m_lba_opts._KEY + ".txt";
+        std::fstream eigen_file;
+        eigen_file.open(eigen_file_name.c_str(), std::ios_base::app);
+
+        /*covR_file << vi.second->NbView() << " "; 
+        covC_file << vi.second->NbView() << " "; */
+        hess_file << vi.second->NbView() << " "; 
+        eigen_file << vi.second->NbView() << " "; 
         std::vector<std::string> vname_decom = mTriSet->DecompViewNames(view_name);
         for (auto vn : vname_decom)
         {
-            covR_file << vn << " " ; 
-            covC_file << vn << " " ; 
+            /*covR_file << vn << " " ; 
+            covC_file << vn << " " ; */
+            hess_file << vn << " "; 
+            eigen_file << vn << " ";
         }
 
         MatXd H = vi.second->Hg_().H_();
+        MatXd Li = vi.second->Li();
+        VecXd Wi = vi.second->Wi();
+
+        eigen_file << "Wi " ;
+        for (int wi=0; wi<Wi.rows(); wi++)
+            eigen_file << Wi[wi] << " "; 
+        eigen_file << "\nLi ";
+
         for (int aK1=0; aK1<H.rows(); aK1++)
         { 
             for (int aK2=0; aK2<H.cols(); aK2++)
             {
-                if (aK1==aK2)
+                hess_file << H(aK1,aK2) << ", ";
+                eigen_file << Li(aK1,aK2) << ", ";
+
+                //save only diagonal
+                /*if (aK1==aK2)
                 {
                     int id_block = std::floor(double(aK1)/3);
                  
@@ -614,13 +647,20 @@ void cAppCovInMotion::WriteLocalCovs()
                         covC_file << H(aK1,aK2) << " ";
                     else // if odd -> R
                         covR_file << H(aK1,aK2) << " ";
-                }
+                }*/
+
+                //save all
             }
+            eigen_file << "\n";
+            hess_file << "\n";
         }
-        covR_file << "\n";
+        eigen_file << "\n";
+        hess_file << "\n";
+
+        /*covR_file << "\n";
         covR_file.close();
         covC_file << "\n";
-        covC_file.close();
+        covC_file.close();*/
 
     } 
 }
@@ -693,7 +733,9 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
         Mat3d   aR0 = views->View(aCam).R();
         double*  aW = views->View(aCam).Omega();
  
-        double PdsAtten = CostAttenuate(aNbPts,m_lba_opts._NB_LIAIS);
+        // divide by NbCam to give more weight to motions with more images  
+        double PdsAtten = CostAttenuate(aNbPts,m_lba_opts._NB_LIAIS); 
+        //PdsAtten *=  1.0/sqrt(NbCam); 
 
         //residuals on features
         //std::cout << "****CAM" << aCam << " features nb=" << aNbPts << " " << PdsAtten << "\n";
@@ -707,14 +749,18 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
                                         aFeat2d->at(aK).at(aCam),
                                         1.0,
                                         m_lba_opts._FOCAL);
-                double res_non_pond =0;
-                eval(aW, aC, aFeat3d->at(aK),&res_non_pond);
+                double res_non_pond[2];
+                eval(aW, aC, aFeat3d->at(aK),res_non_pond);
+                //std::cout << "eval " << res_non_pond[1] << " " << res_non_pond[0]  << "\n";
                 //if (res_non_pond*m_lba_opts._FOCAL <3)
 
-                if (res_non_pond<m_lba_opts._MAX_ERR)//viabon and PVA with "3"
+                double ResIm = std::sqrt(res_non_pond[0]*res_non_pond[0]+
+                                         res_non_pond[1]*res_non_pond[1]);
+                if (ResIm<m_lba_opts._MAX_ERR)//viabon and PVA with "3"
                 {
                     //std::cout << "==>" << res_non_pond*5560 << " " ;
                  
+                    double PdsResIm = std::sqrt(1+ResIm/m_lba_opts._FOCAL);
                     CostFunction * aCostF = cResidualError::Create( aR0,
                                                                     aFeat2d->at(aK).at(aCam),
                                                                     PdsAtten,
@@ -926,7 +972,7 @@ bool cAppCovInMotion::BuildProblem_(cNviewPoseX*& views,std::string views_name)
     //std::cout << "\ntotal res=" << res_total << "\n";
     //res_total *= m_lba_opts._FOCAL; 
 
-    views->TotalRes() =  1.0;//aNbPts/res_total; //res_total/aNbPts res 0.69
+    views->TotalRes() =  std::sqrt(res_total/aNbPts); //1.0;//aNbPts/res_total; //res_total/aNbPts res 0.69
 
 
     //Eigen::VectorXd my_vect = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(JtWres.data(), JtWres.size());//fixed-size to dynamic
@@ -1137,10 +1183,10 @@ void cAppCovInMotion::SetMinimizerGlobal(ceres::Solver::Options& aSolOpt)
   aSolOpt.use_nonmonotonic_steps = false;
 
   /*aSolOpt.function_tolerance = 0.0;
-  aSolOpt.gradient_tolerance = 0.0;
-  aSolOpt.parameter_tolerance = 0.0;*/
+  aSolOpt.gradient_tolerance = 0.0; */
+  aSolOpt.parameter_tolerance = 1e-8;//def=1e-8
 
-  aSolOpt.max_num_iterations = 200;
+  aSolOpt.max_num_iterations = m_gba_opts._NB_MAX_ITER; //30 
   aSolOpt.minimizer_progress_to_stdout = true;
   aSolOpt.num_threads = m_gba_opts._PROC_COUNT;
 
@@ -1309,7 +1355,7 @@ bool cAppCovInMotion::OptimizeRelMotionsGloballyAllViewsWithDecomp()
             MatXd Li = view_i.second->Li();
             VecXd Cstei = view_i.second->Cstei();
          
-            double total_res = view_i.second->TotalRes();
+            double total_res = 1.0; //view_i.second->TotalRes();  // 1.0
          
          
             cPose*& pose0 = mTriSet->Pose(view_i.second->View(0).Name());
@@ -1326,27 +1372,50 @@ bool cAppCovInMotion::OptimizeRelMotionsGloballyAllViewsWithDecomp()
                 if (m_gba_opts._PROPAGATE)
                 {
                     /* Unknown poses, constant similarity */ 
-                    /*CostFunction * aCost = cResidualOn2ViewsPoseDecomp::Create(alpha0,beta,lambda,
-                                                          rVec,RVec,
-                                                          Wi,Li,Cstei) ;
-                    aProblem->AddResidualBlock(aCost,NULL,
-                                         C0,W0,C1,W1);*/
+
+                    double ind_res[12] = {1,1,1,1,1,1,1,1,1,1,1,1};
+
+                    if (m_gba_opts._IRLS)
+                    {
+                        cResidualOn2ViewsPoseDecompLAB eval (alpha0,
+                                                         rVec,RVec,
+                                                         Wi,Li,Cstei,
+                                                         total_res,ind_res);
+                        eval(C0,W0,C1,W1,alpha_beta_l,ind_res);
+                    }
+                    /*for (int i=0; i<12; i++)
+                        std::cout << ind_res[i] << " ";
+                    std::cout << " ===2\n";*/
+
                  
                     CostFunction * aCost = cResidualOn2ViewsPoseDecompLAB::Create(alpha0,
                                                           rVec,RVec,
-                                                          Wi,Li,Cstei,total_res) ;
+                                                          Wi,Li,Cstei,
+                                                          total_res,ind_res) ;
               
-                    LossFunction * aLoss = NULL; //new HuberLoss(m_gba_opts._HUBER_S);
+                    LossFunction * aLoss = new HuberLoss(m_gba_opts._HUBER_S);
          
                     aProblem->AddResidualBlock(aCost,aLoss,
                                          C0,W0,C1,W1,alpha_beta_l);
                 }
                 else
                 {
-                    CostFunction* Cost = cResidualOn3ViewsPoseBasicLAB::Create(alpha0,cVec,rVec,RVec,
+                    double ind_res[12] = {1,1,1,1,1,1,1,1,1,1,1,1};
+                    if (m_gba_opts._IRLS)
+                    {
+                        cResidualOn2ViewsPoseBasicLAB eval(alpha0,cVec,rVec,RVec,
+                                                       m_gba_opts._C_PDS,
+                                                       m_gba_opts._ROT_PDS,
+                                                       ind_res);
+                        eval(C0,W0,C1,W1,alpha_beta_l,ind_res);
+                    }
+
+                    CostFunction* Cost = cResidualOn2ViewsPoseBasicLAB::Create(alpha0,cVec,rVec,RVec,
                                                                                 m_gba_opts._C_PDS,
-                                                                                m_gba_opts._ROT_PDS);
-                    LossFunction * Loss = NULL;
+                                                                                m_gba_opts._ROT_PDS,
+                                                                                ind_res);
+
+                    LossFunction * Loss = new HuberLoss(m_gba_opts._HUBER_S);
                     aProblem->AddResidualBlock(Cost,Loss,C0,W0,C1,W1,alpha_beta_l);
                                                                                
                 }
@@ -1364,29 +1433,51 @@ bool cAppCovInMotion::OptimizeRelMotionsGloballyAllViewsWithDecomp()
                 if (m_gba_opts._PROPAGATE)
                 {
                     /* Unknown poses, constant similarity */ 
-                    /*Vec3d beta {alpha_beta_l[3],alpha_beta_l[4],alpha_beta_l[5]};
-                    double L = alpha_beta_l[6];
-                    CostFunction * aCost = cResidualOn3ViewsPoseDecomp::Create(alpha0,beta,L,
-                                                          rVec,RVec,
-                                                          Wi,Li,Cstei) ;
-                    aProblem->AddResidualBlock(aCost,NULL,
-                                         C0,W0,C1,W1,C2,W2); */
+                   
+                    double ind_res[18] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
+
+
+                    if (m_gba_opts._IRLS)
+                    {
+                        cResidualOn3ViewsPoseDecompLAB eval(alpha0,
+                                                         rVec,RVec,
+                                                         Wi,Li,Cstei,
+                                                         total_res, ind_res);
+
+                        eval(C0,W0,C1,W1,C2,W2,alpha_beta_l,ind_res);
+                    }
+                   /* for (int i=0; i<18; i++)
+                        std::cout << ind_res[i] << " ";
+                    std::cout << " ===3\n"; */
               
                     CostFunction * aCost = cResidualOn3ViewsPoseDecompLAB::Create(alpha0,
                                                           rVec,RVec,
                                                           Wi,Li,Cstei,
-                                                          total_res) ; 
+                                                          total_res,ind_res) ; 
               
-                    LossFunction * aLoss = NULL; //new HuberLoss(m_gba_opts._HUBER_S);
+                    LossFunction * aLoss = new HuberLoss(m_gba_opts._HUBER_S);
                     aProblem->AddResidualBlock(aCost,aLoss,
                                          C0,W0,C1,W1,C2,W2,alpha_beta_l);
                 }
                 else
                 {
+                    double ind_res[18] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
+                    
+                    if (m_gba_opts._IRLS)
+                    {
+                        cResidualOn3ViewsPoseBasicLAB eval(alpha0,cVec,rVec,RVec,
+                                                       m_gba_opts._C_PDS,
+                                                       m_gba_opts._ROT_PDS,
+                                                       ind_res);
+                        eval(C0,W0,C1,W1,C2,W2,alpha_beta_l,ind_res);
+                    }
+
                     CostFunction* Cost = cResidualOn3ViewsPoseBasicLAB::Create(alpha0,cVec,rVec,RVec,
                                                                               m_gba_opts._C_PDS,
-                                                                              m_gba_opts._ROT_PDS);
-                    LossFunction * Loss = NULL;
+                                                                              m_gba_opts._ROT_PDS,
+                                                                              ind_res);
+
+                    LossFunction * Loss = new HuberLoss(m_gba_opts._HUBER_S);
                     aProblem->AddResidualBlock(Cost,Loss,C0,W0,C1,W1,C2,W2,alpha_beta_l);
          
                 }
@@ -1394,14 +1485,15 @@ bool cAppCovInMotion::OptimizeRelMotionsGloballyAllViewsWithDecomp()
                
             }
            
-            for (int aCam=0; aCam<NbCam; aCam++)
+            for (int aCam=0; aCam<NbCam; aCam++){
                 mTriSet->Pose(view_i.second->View(aCam).Name())->SetRefined();
-
+                //std::cout << view_i.second->View(aCam).Name() << " REFINED\n";
+            }
         }
     }
 
     //add constraint on initial global poses 
-    if (m_gba_opts._CONSTRAIN_GPOSE)
+    if (m_gba_opts._CONSTRAIN_GPOSE || m_gba_opts._CONSTRAIN_GPOSE_CUR)
     {
         for (auto pose_i : mTriSet->mGlobalPoses)
         {
@@ -1413,16 +1505,29 @@ bool cAppCovInMotion::OptimizeRelMotionsGloballyAllViewsWithDecomp()
                 double* W = pose_i.second->Omega();
                 double* W_immutable = pose_i.second->Omega_immutable();
             
-                //LossFunction * aLossW = new HuberLoss(m_gba_opts._HUBER_P);
-                //LossFunction * aLossC = new HuberLoss(m_gba_opts._HUBER_P);
-                
-                //perspective center
-                CostFunction * CostC = cPoseConstraint::Create(C_immutable,m_gba_opts._C_PDS);
-                ceres::ResidualBlockId res_C_id = aProblem->AddResidualBlock(CostC,NULL,(C));
- 
-                //small rotation
-                CostFunction * CostR = cPoseConstraint::Create(W_immutable,m_gba_opts._ROT_PDS);
-                ceres::ResidualBlockId res_W_id = aProblem->AddResidualBlock(CostR,NULL,(W));
+                //rappel on the initial value 
+                if (m_gba_opts._CONSTRAIN_GPOSE)
+                {
+                    //perspective center
+                    CostFunction * CostC = cPoseConstraint::Create(C_immutable,m_gba_opts._C_PDS);
+                    ceres::ResidualBlockId res_C_id = aProblem->AddResidualBlock(CostC,NULL,(C));
+                 
+                    //small rotation
+                    CostFunction * CostR = cPoseConstraint::Create(W_immutable,m_gba_opts._ROT_PDS);
+                    ceres::ResidualBlockId res_W_id = aProblem->AddResidualBlock(CostR,NULL,(W));
+                }
+                else if (m_gba_opts._CONSTRAIN_GPOSE_CUR)
+                //rappel on current value 
+                {
+                    //perspective center
+                    CostFunction * CostC = cPoseConstraint::Create(C,m_gba_opts._C_PDS);
+                    ceres::ResidualBlockId res_C_id = aProblem->AddResidualBlock(CostC,NULL,(C));
+                 
+                    //small rotation
+                    CostFunction * CostR = cPoseConstraint::Create(W,m_gba_opts._ROT_PDS);
+                    ceres::ResidualBlockId res_W_id = aProblem->AddResidualBlock(CostR,NULL,(W));
+
+                }
             }
         }
     }
@@ -1477,7 +1582,16 @@ bool cAppCovInMotion::OptimizeRelMotionsGloballyAllViewsWithDecomp()
     aOpts.linear_solver_ordering.reset(ordering);
  * */
 
+    //logging evolution of the solver 
+    if (m_gba_opts._MONITOR_SOLVER_EVOL)
+    {
+        Opts.update_state_every_iteration = true; 
 
+        SolverEvolutionCallback SELog(mTriSet);
+        Opts.callbacks.push_back(&SELog);
+    }
+
+    //solve 
     ceres::Solve(Opts,aProblem,&aSummary);
     std::cout << aSummary.FullReport() << "\n";
 
@@ -1527,6 +1641,29 @@ bool cAppCovInMotion::OptimizeRelMotionsGloballyAllViewsWithDecomp()
     return EXIT_SUCCESS;
 }
 
+ceres::CallbackReturnType SolverEvolutionCallback::operator()(const ceres::IterationSummary& summary)
+{
+    const char* kReportRowFormat =
+        "% 4d: f:% 8e d:% 3.2e g:% 3.2e h:% 3.2e "
+        "rho:% 3.2e mu:% 3.2e eta:% 3.2e li:% 3d";
+    std::string output = ceres::internal::StringPrintf(kReportRowFormat,
+                                 summary.iteration,
+                                 summary.cost,
+                                 summary.cost_change,
+                                 summary.gradient_max_norm,
+                                 summary.step_norm,
+                                 summary.relative_decrease,
+                                 summary.trust_region_radius,
+                                 summary.eta,
+                                 summary.linear_solver_iterations);
+    VLOG(1) << output;
+
+    std::string LogFilename = "LogParamIter-"+std::to_string(summary.iteration)+".txt";
+    mTriSetCur->SaveGlobalPoses(LogFilename);
+       
+
+    return SOLVER_CONTINUE;
+}
 
 
 //obsolete
@@ -1793,6 +1930,9 @@ cAppCovInMotion::cAppCovInMotion(const InputFiles& inputs,
         if (1)
             mTriSet->PrintSumDelta();
 
+        /* Print global and local settings */
+        m_lba_opts.Show();
+        m_gba_opts.Show();
     }
     catch (std::exception& e)
     {

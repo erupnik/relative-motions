@@ -99,7 +99,7 @@ bool cTripletSet::ReadViews()
                 cPose* aPose21_ = new cPose(aRot21,aC21,aPoseNameV[1]);
  
                 mAllViewMap[aViewName] = new cNviewPoseX
-                         (aPose1_,aPose21_,NULL,new cHessianGradientX(Mat6d::Zero(),Vec6d::Zero()));
+                         (aPose1_,aPose21_,NULL,new cHessianGradientX(Mat12d::Zero(),Vec12d::Zero()));
  
             }
             else if (aNbV==3) //three-view?
@@ -126,7 +126,7 @@ bool cTripletSet::ReadViews()
               cPose* aPose31_ = new cPose(aRot31,aC31,aPoseNameV[2]);
  
               mAllViewMap[aViewName] = new cNviewPoseX
-                       (aPose1_,aPose21_,aPose31_,new cHessianGradientX(Mat12d::Zero(),Vec12d::Zero()));
+                       (aPose1_,aPose21_,aPose31_,new cHessianGradientX(Mat18d::Zero(),Vec18d::Zero()));
  
             }
             else
@@ -584,7 +584,7 @@ void cTripletSet::SaveGlobalPoses(const std::string& filename)
                  -pose0->Omega()[1], pose0->Omega()[0],             1;
          
          
-            Mat3d newR = pose0->R()*dWI;
+            Mat3d newR = pose0->R()* NearestRotation(dWI);//added nearest rotation
             //pose0->Show();
          
             eo_file << pose.first << " " << newR(0,0) << " " << newR(0,1) << " " << newR(0,2)
@@ -609,8 +609,98 @@ void cTripletSet::SaveGlobalPoses(const std::string& filename)
                                   << " " << pose0->C_immutable()[2] << "\n";*/ 
 
         }
+        else
+            std::cout << pose.first << " was not refined.\n";
     }
     eo_file.close();
+
+}
+
+void cTripletSet::WriteSVGGraph(const std::string& filename,bool projX,bool projY,bool projZ)
+{
+
+    /* Map images to indices */
+    std::map<std::string,int> im2id;
+    int id=0;
+    for (auto pose : mGlobalPoses)
+    {
+        im2id[pose.first] = id;
+        id++;
+
+    }
+
+
+    std::ofstream file(filename);
+    file << "graph 1 {" << std::endl;
+    file << "node [shape=circle]" << std::endl;
+
+    //add nodes in positions
+    //a [fillcolor="#d62728" pos="0,0!"]
+    //node [pos="8058,114!"]; 3;
+    double Mul=10.0;
+    for (auto pose : mGlobalPoses)
+    {
+        cPose * pose0 = mGlobalPoses[pose.first];
+
+        file << "node [pos=\"" << (projX ? std::round(pose0->C()[0]*Mul) : std::round(pose0->C()[1]*Mul))
+             << "," << (projZ ? std::round(pose0->C()[2]*Mul) : std::round(pose0->C()[1]*Mul) )
+             << "!\"]; n" << im2id[pose.first] << "\n";
+    }
+
+    //add edges
+    int Count=0;
+    for (auto a3v : mAllViewMap)
+    {
+        int NumView = a3v.second->NbView();
+      
+        std::cout << a3v.second->View(0).Name() << " " << a3v.second->View(1).Name() << "\n";
+       
+
+        //[dir=both color="red:blue"]
+
+        //if (!(Count % 2))
+        {
+            if (NumView==2)
+            {
+                file 
+                    << " n" << im2id[a3v.second->View(0).Name()] 
+                    << " -- "
+                    << " n" << im2id[a3v.second->View(1).Name()]  << " [dir=none color=\"orange\" penwidth=3]\n";
+            }
+         
+            if (NumView==3)
+            {
+                file 
+                    << " n" << im2id[a3v.second->View(0).Name()]
+                    << " -- "
+                    << " n" << im2id[a3v.second->View(1).Name()]  << " [dir=none color=\"blue\"]\n";
+         
+                file 
+                << " n" << im2id[a3v.second->View(0).Name()]
+                << " -- "
+                << " n" << im2id[a3v.second->View(2).Name()]  << " [dir=none color=\"blue\"]\n";
+         
+                file 
+                << " n" << im2id[a3v.second->View(1).Name()]
+                << " -- "
+                << " n" << im2id[a3v.second->View(2).Name()]  << " [dir=none color=\"blue\"]\n";
+         
+         
+            }
+
+        }
+
+        Count++;
+
+    }
+    file << "}" << std::endl;
+    file.close();
+
+    //Use Graphviz
+    const std::string cmd = "neato -Tsvg -O -Gsplines=false " + filename;
+
+    std::cout << cmd << "\n";
+    std::system(cmd.c_str());
 
 }
 
@@ -632,8 +722,8 @@ void cTripletSet::WriteGlobalPFromRelPAndSim(const std::string& filename)
             Vec3d T;
             LocalToGlobal(a3v.second,view,R,T);
 
-            //eo_file << im_name << " " << R(0,0) << " " << R(0,1) << " " << R(0,2)
-            eo_file << a3v.second->View(view).Name() << " " << R(0,0) << " " << R(0,1) << " " << R(0,2)
+            eo_file << im_name << " " << R(0,0) << " " << R(0,1) << " " << R(0,2)
+            //eo_file << a3v.second->View(view).Name() << " " << R(0,0) << " " << R(0,1) << " " << R(0,2)
                                << " " << R(1,0) << " " << R(1,1) << " " << R(1,2)
                                << " " << R(2,0) << " " << R(2,1) << " " << R(2,2)
                                << " " << T[0]

@@ -33,7 +33,8 @@ class cTripletSet
 
         void WriteGlobalPFromRelPAndSim(const std::string& );
         void SaveGlobalPoses(const std::string&);
-        
+        void WriteSVGGraph(const std::string&,bool,bool,bool);
+
         cPose*& Pose(std::string name) {return mGlobalPoses[name];}        
 
     private:

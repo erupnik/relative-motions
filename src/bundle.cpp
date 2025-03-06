@@ -363,43 +363,47 @@ bool cResidualOn3ViewsPoseDecompLAB::operator() (const T* const C0, const T* con
 getchar();*/ 
 
     //res = w (l * C - cste)
-    Eigen::Matrix<T,18,1> res_c_wr =  1.0/m_tot_res * (m_Li * c_wr - m_Cstei);
+    Eigen::Matrix<T,18,1> res_c_wr = 1.0/m_tot_res * (m_Li * c_wr - m_Cstei);
 
 
-    Residual[0] = T(std::sqrt(m_Wi(0))) * res_c_wr(0);
-    Residual[1] = T(std::sqrt(m_Wi(1))) * res_c_wr(1);
-    Residual[2] = T(std::sqrt(m_Wi(2))) * res_c_wr(2);
+    Residual[0] =  T( std::sqrt(1.0/(std::sqrt(1 + m_ind_res[0]*m_ind_res[0]))) *  std::sqrt(m_Wi(0))) * res_c_wr(0);
+    Residual[1] =  T( std::sqrt(1.0/(std::sqrt(1 + m_ind_res[1]*m_ind_res[1]))) *  std::sqrt(m_Wi(1))) * res_c_wr(1);
+    Residual[2] =  T( std::sqrt(1.0/(std::sqrt(1 + m_ind_res[2]*m_ind_res[2]))) *  std::sqrt(m_Wi(2))) * res_c_wr(2);
+                                                         
+    Residual[3] =  T( std::sqrt(1.0/(std::sqrt(1 + m_ind_res[3]*m_ind_res[3]))) *  std::sqrt(m_Wi(3))) * res_c_wr(3);
+    Residual[4] =  T( std::sqrt(1.0/(std::sqrt(1 + m_ind_res[4]*m_ind_res[4]))) *  std::sqrt(m_Wi(4))) * res_c_wr(4);
+    Residual[5] =  T( std::sqrt(1.0/(std::sqrt(1 + m_ind_res[5]*m_ind_res[5]))) *  std::sqrt(m_Wi(5))) * res_c_wr(5);
+                                                         
+    Residual[6] =  T( std::sqrt(1.0/(std::sqrt(1 + m_ind_res[6]*m_ind_res[6]))) *  std::sqrt(m_Wi(6))) * res_c_wr(6);
+    Residual[7] =  T( std::sqrt(1.0/(std::sqrt(1 + m_ind_res[7]*m_ind_res[7]))) *  std::sqrt(m_Wi(7))) * res_c_wr(7);
+    Residual[8] =  T( std::sqrt(1.0/(std::sqrt(1 + m_ind_res[8]*m_ind_res[8]))) *  std::sqrt(m_Wi(8))) * res_c_wr(8);
+                                                         
+    Residual[9] =  T( std::sqrt(1.0/(std::sqrt(1 + m_ind_res[9]*m_ind_res[9]))) *  std::sqrt(m_Wi(9))) * res_c_wr(9);
+    Residual[10] = T( std::sqrt(1.0/(std::sqrt(1 + m_ind_res[10]*m_ind_res[10]))) *  std::sqrt(m_Wi(10))) * res_c_wr(10);
+    Residual[11] = T( std::sqrt(1.0/(std::sqrt(1 + m_ind_res[11]*m_ind_res[11]))) *  std::sqrt(m_Wi(11))) * res_c_wr(11);
+                                                         
+    Residual[12] = T( std::sqrt(1.0/(std::sqrt(1 + m_ind_res[12]*m_ind_res[12]))) *  std::sqrt(m_Wi(12))) * res_c_wr(12);
+    Residual[13] = T( std::sqrt(1.0/(std::sqrt(1 + m_ind_res[13]*m_ind_res[13]))) *  std::sqrt(m_Wi(13))) * res_c_wr(13);
+    Residual[14] = T( std::sqrt(1.0/(std::sqrt(1 + m_ind_res[14]*m_ind_res[14]))) *  std::sqrt(m_Wi(14))) * res_c_wr(14);
+    Residual[15] = T( std::sqrt(1.0/(std::sqrt(1 + m_ind_res[15]*m_ind_res[15]))) *  std::sqrt(m_Wi(15))) * res_c_wr(15);
+    Residual[16] = T( std::sqrt(1.0/(std::sqrt(1 + m_ind_res[16]*m_ind_res[16]))) *  std::sqrt(m_Wi(16))) * res_c_wr(16);
+    Residual[17] = T( std::sqrt(1.0/(std::sqrt(1 + m_ind_res[17]*m_ind_res[17]))) *  std::sqrt(m_Wi(17))) * res_c_wr(17);
 
-    Residual[3] = T(std::sqrt(m_Wi(3))) * res_c_wr(3);
-    Residual[4] = T(std::sqrt(m_Wi(4))) * res_c_wr(4);
-    Residual[5] = T(std::sqrt(m_Wi(5))) * res_c_wr(5);
 
-    Residual[6] = T(std::sqrt(m_Wi(6))) * res_c_wr(6);
-    Residual[7] = T(std::sqrt(m_Wi(7))) * res_c_wr(7);
-    Residual[8] = T(std::sqrt(m_Wi(8))) * res_c_wr(8);
-
-    Residual[9] = T(std::sqrt(m_Wi(9))) * res_c_wr(9);
-    Residual[10] = T(std::sqrt(m_Wi(10))) * res_c_wr(10);
-    Residual[11] = T(std::sqrt(m_Wi(11))) * res_c_wr(11);
-
-    Residual[12] = T(std::sqrt(m_Wi(12))) * res_c_wr(12);
-    Residual[13] = T(std::sqrt(m_Wi(13))) * res_c_wr(13);
-    Residual[14] = T(std::sqrt(m_Wi(14))) * res_c_wr(14);
-    Residual[15] = T(std::sqrt(m_Wi(15))) * res_c_wr(15);
-    Residual[16] = T(std::sqrt(m_Wi(16))) * res_c_wr(16);
-    Residual[17] = T(std::sqrt(m_Wi(17))) * res_c_wr(17);
 
     return true;
 }
 
 CostFunction* cResidualOn3ViewsPoseDecompLAB::Create(const Mat3d alpha0, 
                                                      const std::vector<Mat3d> rV, const std::vector<Mat3d> R0V,
-                                                     const VecXd Wi, const MatXd Li, const VecXd Cstei,const double total_res)
+                                                     const VecXd Wi, const MatXd Li, const VecXd Cstei,
+                                                     const double total_res,const double ind_res[])
 {
 
     return  (new AutoDiffCostFunction<cResidualOn3ViewsPoseDecompLAB,18,3,3,3,3,3,3,7> (new cResidualOn3ViewsPoseDecompLAB(alpha0,                                                                                                                rV,R0V,
                                                                                                                 Wi,Li,Cstei,
-                                                                                                                total_res)));
+                                                                                                                total_res,
+                                                                                                                ind_res)));
 }
 
 template <typename T>
@@ -473,25 +477,26 @@ bool cResidualOn2ViewsPoseDecompLAB::operator() (const T* const C0, const T* con
     c_wr[11] = wr1(1,0);
 
     //res = w (l * C - cste)
-    Eigen::Matrix<T,12,1> res_c_wr = 1.0/m_tot_res * (m_Li * c_wr - m_Cstei);
+    //1.0/sqrt(2) = 0.71
+    //1.0/sqrt(1+3) = 0.58
+    Eigen::Matrix<T,12,1> res_c_wr = 0.1 * 1.0/m_tot_res * (m_Li * c_wr - m_Cstei);
 
 
-    Residual[0] = T(std::sqrt(m_Wi(0))) * res_c_wr(0);
-    Residual[1] = T(std::sqrt(m_Wi(1))) * res_c_wr(1);
-    Residual[2] = T(std::sqrt(m_Wi(2))) * res_c_wr(2);
-
-    Residual[3] = T(std::sqrt(m_Wi(3))) * res_c_wr(3);
-    Residual[4] = T(std::sqrt(m_Wi(4))) * res_c_wr(4);
-    Residual[5] = T(std::sqrt(m_Wi(5))) * res_c_wr(5);
-
-    Residual[6] = T(std::sqrt(m_Wi(6))) * res_c_wr(6);
-    Residual[7] = T(std::sqrt(m_Wi(7))) * res_c_wr(7);
-    Residual[8] = T(std::sqrt(m_Wi(8))) * res_c_wr(8);
-
-    Residual[9] = T(std::sqrt(m_Wi(9))) * res_c_wr(9);
-    Residual[10] = T(std::sqrt(m_Wi(10))) * res_c_wr(10);
-    Residual[11] = T(std::sqrt(m_Wi(11))) * res_c_wr(11);
-
+    Residual[0] =  T(std::sqrt(1.0/(std::sqrt(1 + m_ind_res[0]*m_ind_res[0]))) *   std::sqrt(m_Wi(0))) * res_c_wr(0);
+    Residual[1] =  T(std::sqrt(1.0/(std::sqrt(1 + m_ind_res[1]*m_ind_res[1]))) *   std::sqrt(m_Wi(1))) * res_c_wr(1);
+    Residual[2] =  T(std::sqrt(1.0/(std::sqrt(1 + m_ind_res[2]*m_ind_res[2]))) *   std::sqrt(m_Wi(2))) * res_c_wr(2);
+                                                        
+    Residual[3] =  T(std::sqrt(1.0/(std::sqrt(1 + m_ind_res[3]*m_ind_res[3]))) *   std::sqrt(m_Wi(3))) * res_c_wr(3);
+    Residual[4] =  T(std::sqrt(1.0/(std::sqrt(1 + m_ind_res[4]*m_ind_res[4]))) *   std::sqrt(m_Wi(4))) * res_c_wr(4);
+    Residual[5] =  T(std::sqrt(1.0/(std::sqrt(1 + m_ind_res[5]*m_ind_res[5]))) *   std::sqrt(m_Wi(5))) * res_c_wr(5);
+                                                        
+    Residual[6] =  T(std::sqrt(1.0/(std::sqrt(1 + m_ind_res[6]*m_ind_res[6]))) *   std::sqrt(m_Wi(6))) * res_c_wr(6);
+    Residual[7] =  T(std::sqrt(1.0/(std::sqrt(1 + m_ind_res[7]*m_ind_res[7]))) *   std::sqrt(m_Wi(7))) * res_c_wr(7);
+    Residual[8] =  T(std::sqrt(1.0/(std::sqrt(1 + m_ind_res[8]*m_ind_res[8]))) *   std::sqrt(m_Wi(8))) * res_c_wr(8);
+                                                        
+    Residual[9] =  T(std::sqrt(1.0/(std::sqrt(1 + m_ind_res[9]*m_ind_res[9]))) *   std::sqrt(m_Wi(9))) * res_c_wr(9);
+    Residual[10] = T(std::sqrt(1.0/(std::sqrt(1 + m_ind_res[10]*m_ind_res[10]))) * std::sqrt(m_Wi(10))) * res_c_wr(10);
+    Residual[11] = T(std::sqrt(1.0/(std::sqrt(1 + m_ind_res[11]*m_ind_res[11]))) * std::sqrt(m_Wi(11))) * res_c_wr(11);
 
 
     return true;
@@ -499,12 +504,13 @@ bool cResidualOn2ViewsPoseDecompLAB::operator() (const T* const C0, const T* con
 
 CostFunction* cResidualOn2ViewsPoseDecompLAB::Create(const Mat3d alpha0, 
                                                      const std::vector<Mat3d> rV, const std::vector<Mat3d> R0V,
-                                                     const VecXd Wi, const MatXd Li, const VecXd Cstei,const double total_res)
+                                                     const VecXd Wi, const MatXd Li, const VecXd Cstei,
+                                                     const double total_res,const double ind_res[])
 {
 
     return  (new AutoDiffCostFunction<cResidualOn2ViewsPoseDecompLAB,12,3,3,3,3,7> (new cResidualOn2ViewsPoseDecompLAB(alpha0,                                                                                                                rV,R0V,
                                                                                                                 Wi,Li,Cstei,
-                                                                                                                total_res)));
+                                                                                                                total_res,ind_res)));
 }
 
 template <typename T>
@@ -605,29 +611,29 @@ bool cResidualOn3ViewsPoseBasicLAB::operator()(const T* const C0, const T* const
     //- print residuals to make sure equations are OK
 
 
-    Residual[0]  = (m_cV[0][0] - c_wr[0])/mPdsSqrt_c; 
-    Residual[1]  = (m_cV[0][1] - c_wr[1])/mPdsSqrt_c; 
-    Residual[2]  = (m_cV[0][2] - c_wr[2])/mPdsSqrt_c; 
+    Residual[0]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[0]*m_ind_res[0])/(mPdsSqrt_c*mPdsSqrt_c)))) *  (m_cV[0][0] - c_wr[0])/mPdsSqrt_c; 
+    Residual[1]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[1]*m_ind_res[1])/(mPdsSqrt_c*mPdsSqrt_c)))) *  (m_cV[0][1] - c_wr[1])/mPdsSqrt_c; 
+    Residual[2]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[2]*m_ind_res[2])/(mPdsSqrt_c*mPdsSqrt_c)))) *  (m_cV[0][2] - c_wr[2])/mPdsSqrt_c; 
 
-    Residual[3]  = (0.0 - c_wr[3])/mPdsSqrt_w;
-    Residual[4]  = (0.0 - c_wr[4])/mPdsSqrt_w;
-    Residual[5]  = (0.0 - c_wr[5])/mPdsSqrt_w;
+    Residual[3]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[3]*m_ind_res[3])/(mPdsSqrt_w*mPdsSqrt_w)))) *  (0.0 - c_wr[3])/mPdsSqrt_w;
+    Residual[4]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[4]*m_ind_res[4])/(mPdsSqrt_w*mPdsSqrt_w)))) *  (0.0 - c_wr[4])/mPdsSqrt_w;
+    Residual[5]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[5]*m_ind_res[5])/(mPdsSqrt_w*mPdsSqrt_w)))) *  (0.0 - c_wr[5])/mPdsSqrt_w;
 
-    Residual[6]  = (m_cV[1][0] - c_wr[6])/mPdsSqrt_c; 
-    Residual[7]  = (m_cV[1][1] - c_wr[7])/mPdsSqrt_c;
-    Residual[8]  = (m_cV[1][2] - c_wr[8])/mPdsSqrt_c;
+    Residual[6]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[6]*m_ind_res[6])/(mPdsSqrt_c*mPdsSqrt_c)))) *  (m_cV[1][0] - c_wr[6])/mPdsSqrt_c; 
+    Residual[7]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[7]*m_ind_res[7])/(mPdsSqrt_c*mPdsSqrt_c)))) *  (m_cV[1][1] - c_wr[7])/mPdsSqrt_c;
+    Residual[8]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[8]*m_ind_res[8])/(mPdsSqrt_c*mPdsSqrt_c)))) *  (m_cV[1][2] - c_wr[8])/mPdsSqrt_c;
 
-    Residual[9]  = (0.0 - c_wr[9])/mPdsSqrt_w; 
-    Residual[10] = (0.0 - c_wr[10])/mPdsSqrt_w;
-    Residual[11] = (0.0 - c_wr[11])/mPdsSqrt_w;
+    Residual[9]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[9]*m_ind_res[9])/(mPdsSqrt_w*mPdsSqrt_w)))) *  (0.0 - c_wr[9])/mPdsSqrt_w; 
+    Residual[10] = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[10]*m_ind_res[10])/(mPdsSqrt_w*mPdsSqrt_w)))) * (0.0 - c_wr[10])/mPdsSqrt_w;
+    Residual[11] = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[11]*m_ind_res[11])/(mPdsSqrt_w*mPdsSqrt_w)))) * (0.0 - c_wr[11])/mPdsSqrt_w;
 
-    Residual[12] = (m_cV[2][0] - c_wr[12])/mPdsSqrt_c;
-    Residual[13] = (m_cV[2][1] - c_wr[13])/mPdsSqrt_c;
-    Residual[14] = (m_cV[2][2] - c_wr[14])/mPdsSqrt_c;
+    Residual[12] = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[12]*m_ind_res[12])/(mPdsSqrt_c*mPdsSqrt_c)))) * (m_cV[2][0] - c_wr[12])/mPdsSqrt_c;
+    Residual[13] = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[13]*m_ind_res[13])/(mPdsSqrt_c*mPdsSqrt_c)))) * (m_cV[2][1] - c_wr[13])/mPdsSqrt_c;
+    Residual[14] = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[14]*m_ind_res[14])/(mPdsSqrt_c*mPdsSqrt_c)))) * (m_cV[2][2] - c_wr[14])/mPdsSqrt_c;
 
-    Residual[15] = (0.0 - c_wr[15])/mPdsSqrt_w;
-    Residual[16] = (0.0 - c_wr[16])/mPdsSqrt_w;
-    Residual[17] = (0.0 - c_wr[17])/mPdsSqrt_w;
+    Residual[15] = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[15]*m_ind_res[15])/(mPdsSqrt_w*mPdsSqrt_w)))) * (0.0 - c_wr[15])/mPdsSqrt_w;
+    Residual[16] = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[16]*m_ind_res[16])/(mPdsSqrt_w*mPdsSqrt_w)))) * (0.0 - c_wr[16])/mPdsSqrt_w;
+    Residual[17] = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[17]*m_ind_res[17])/(mPdsSqrt_w*mPdsSqrt_w)))) * (0.0 - c_wr[17])/mPdsSqrt_w;
 
     /*for (int i=0;i<18; i++)
         std::cout << Residual[i] << " " ;
@@ -644,11 +650,12 @@ CostFunction* cResidualOn3ViewsPoseBasicLAB::Create( const Mat3d alpha0,
                                                      const std::vector<Mat3d> rV, 
                                                      const std::vector<Mat3d> R0V,
                                                      const double             Pds_c,
-                                                     const double             Pds_w)
+                                                     const double             Pds_w,
+                                                     const double ind_res[])
 {
 
     return  (new AutoDiffCostFunction<cResidualOn3ViewsPoseBasicLAB,18,3,3,3,3,3,3,7> 
-                  (new cResidualOn3ViewsPoseBasicLAB(alpha0,cV,rV,R0V,Pds_c,Pds_w)));
+                  (new cResidualOn3ViewsPoseBasicLAB(alpha0,cV,rV,R0V,Pds_c,Pds_w,ind_res)));
 }
 
 
@@ -728,21 +735,21 @@ bool cResidualOn2ViewsPoseBasicLAB::operator()(const T* const C0, const T* const
     //- print residuals to make sure equations are OK
 
 
-    Residual[0]  = (m_cV[0][0] - c_wr[0])/mPdsSqrt_c; 
-    Residual[1]  = (m_cV[0][1] - c_wr[1])/mPdsSqrt_c; 
-    Residual[2]  = (m_cV[0][2] - c_wr[2])/mPdsSqrt_c; 
-
-    Residual[3]  = (0.0 - c_wr[3])/mPdsSqrt_w;
-    Residual[4]  = (0.0 - c_wr[4])/mPdsSqrt_w;
-    Residual[5]  = (0.0 - c_wr[5])/mPdsSqrt_w;
-
-    Residual[6]  = (m_cV[1][0] - c_wr[6])/mPdsSqrt_c; 
-    Residual[7]  = (m_cV[1][1] - c_wr[7])/mPdsSqrt_c;
-    Residual[8]  = (m_cV[1][2] - c_wr[8])/mPdsSqrt_c;
-
-    Residual[9]  = (0.0 - c_wr[9])/mPdsSqrt_w; 
-    Residual[10] = (0.0 - c_wr[10])/mPdsSqrt_w;
-    Residual[11] = (0.0 - c_wr[11])/mPdsSqrt_w;
+    Residual[0]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[0]*m_ind_res[0])/(mPdsSqrt_c*mPdsSqrt_c)))) *  (m_cV[0][0] - c_wr[0])/mPdsSqrt_c; 
+    Residual[1]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[1]*m_ind_res[1])/(mPdsSqrt_c*mPdsSqrt_c)))) *  (m_cV[0][1] - c_wr[1])/mPdsSqrt_c; 
+    Residual[2]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[2]*m_ind_res[2])/(mPdsSqrt_c*mPdsSqrt_c)))) *  (m_cV[0][2] - c_wr[2])/mPdsSqrt_c; 
+                                                                                                          
+    Residual[3]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[3]*m_ind_res[3])/(mPdsSqrt_w*mPdsSqrt_w)))) *  (0.0 - c_wr[3])/mPdsSqrt_w;
+    Residual[4]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[4]*m_ind_res[4])/(mPdsSqrt_w*mPdsSqrt_w)))) *  (0.0 - c_wr[4])/mPdsSqrt_w;
+    Residual[5]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[5]*m_ind_res[5])/(mPdsSqrt_w*mPdsSqrt_w)))) *  (0.0 - c_wr[5])/mPdsSqrt_w;
+                                                                                                          
+    Residual[6]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[6]*m_ind_res[6])/(mPdsSqrt_c*mPdsSqrt_c)))) *  (m_cV[1][0] - c_wr[6])/mPdsSqrt_c; 
+    Residual[7]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[7]*m_ind_res[7])/(mPdsSqrt_c*mPdsSqrt_c)))) *  (m_cV[1][1] - c_wr[7])/mPdsSqrt_c;
+    Residual[8]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[8]*m_ind_res[8])/(mPdsSqrt_c*mPdsSqrt_c)))) *  (m_cV[1][2] - c_wr[8])/mPdsSqrt_c;
+                                                                                                          
+    Residual[9]  = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[9]*m_ind_res[9])/(mPdsSqrt_w*mPdsSqrt_w)))) *  (0.0 - c_wr[9])/mPdsSqrt_w; 
+    Residual[10] = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[10]*m_ind_res[10])/(mPdsSqrt_w*mPdsSqrt_w)))) * (0.0 - c_wr[10])/mPdsSqrt_w;
+    Residual[11] = std::sqrt(1.0/(std::sqrt(1 + (m_ind_res[11]*m_ind_res[11])/(mPdsSqrt_w*mPdsSqrt_w)))) * (0.0 - c_wr[11])/mPdsSqrt_w;
 
 
     /*for (int i=0;i<12; i++)
@@ -760,11 +767,12 @@ CostFunction* cResidualOn2ViewsPoseBasicLAB::Create( const Mat3d alpha0,
                                                      const std::vector<Mat3d> rV, 
                                                      const std::vector<Mat3d> R0V,
                                                      const double             Pds_c,
-                                                     const double             Pds_w)
+                                                     const double             Pds_w,
+                                                     const double ind_res[])
 {
 
     return  (new AutoDiffCostFunction<cResidualOn2ViewsPoseBasicLAB,12,3,3,3,3,7> 
-            (new cResidualOn2ViewsPoseBasicLAB(alpha0,cV,rV,R0V,Pds_c,Pds_w)));
+            (new cResidualOn2ViewsPoseBasicLAB(alpha0,cV,rV,R0V,Pds_c,Pds_w,ind_res)));
 }
 
 

@@ -27,6 +27,38 @@ struct sAffine
   Vec3d beta;
 };
 
+class SolverEvolutionCallback: public ceres::IterationCallback 
+{
+    public:
+	SolverEvolutionCallback(cTripletSet *&TriSetCur) : mTriSetCur(TriSetCur) {}
+        virtual ceres::CallbackReturnType operator()(const ceres::IterationSummary& summary) ;
+/*	{
+	    const char* kReportRowFormat =
+                "% 4d: f:% 8e d:% 3.2e g:% 3.2e h:% 3.2e "
+                "rho:% 3.2e mu:% 3.2e eta:% 3.2e li:% 3d";
+	    std::string output = ceres::internal::StringPrintf(kReportRowFormat,
+                                         summary.iteration,
+                                         summary.cost,
+                                         summary.cost_change,
+                                         summary.gradient_max_norm,
+                                         summary.step_norm,
+                                         summary.relative_decrease,
+                                         summary.trust_region_radius,
+                                         summary.eta,
+                                         summary.linear_solver_iterations);
+            VLOG(1) << output;
+
+	    std::string LogFilename = "LogParamIter-"+std::to_string(summary.iteration)+".txt";
+//	    mTriSetCur->SaveGlobalPoses(LogFilename);
+
+
+            return SOLVER_CONTINUE;
+        }*/
+    private:
+	cTripletSet *&mTriSetCur;
+};
+
+
 class cPoseGen
 {
   public:

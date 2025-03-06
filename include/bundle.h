@@ -7,6 +7,8 @@
 #include "ceres/ceres.h"
 #include "ceres/types.h"
 #include "ceres/rotation.h"
+#include "ceres/iteration_callback.h"
+#include "ceres/stringprintf.h"
 
 /* Eigen */
 #include <Eigen/Sparse>
@@ -167,14 +169,16 @@ class cResidualOn3ViewsPoseDecompLAB
 {
     public:
         cResidualOn3ViewsPoseDecompLAB(const Mat3d alpha0, const std::vector<Mat3d> rV, const std::vector<Mat3d> R0V,
-                                   const VecXd Wi, const MatXd Li, const VecXd Cstei, const double total_res) :
+                                   const VecXd Wi, const MatXd Li, const VecXd Cstei, 
+                                   const double total_res, const double ind_res[]) :
                                   m_alpha0(alpha0),
                                   m_rV(rV),
                                   m_R0V(R0V),
                                   m_Wi(Wi),
                                   m_Li(Li),
                                   m_Cstei(Cstei),
-                                  m_tot_res(total_res) {}
+                                  m_tot_res(total_res),
+                                  m_ind_res(ind_res) {}
 
         ~cResidualOn3ViewsPoseDecompLAB(){}
 
@@ -186,7 +190,8 @@ class cResidualOn3ViewsPoseDecompLAB
                                 
         static CostFunction* Create(const Mat3d alpha0, 
                                     const std::vector<Mat3d> r0V, const std::vector<Mat3d> R0V,
-                                    const VecXd Wi, const MatXd Li, const VecXd Cstei, const double total_res);
+                                    const VecXd Wi, const MatXd Li, const VecXd Cstei, 
+                                    const double total_res, const double ind_res[]);
 
 
     private:
@@ -201,6 +206,7 @@ class cResidualOn3ViewsPoseDecompLAB
         const VecXd m_Cstei;
         
         const double m_tot_res;
+        const double * m_ind_res;
 
 };
 
@@ -209,14 +215,16 @@ class cResidualOn2ViewsPoseDecompLAB
     public:
         cResidualOn2ViewsPoseDecompLAB(const Mat3d alpha0, 
                                    const std::vector<Mat3d> rV, const std::vector<Mat3d> R0V,
-                                   const VecXd Wi, const MatXd Li, const VecXd Cstei, const double total_res) :
+                                   const VecXd Wi, const MatXd Li, const VecXd Cstei, 
+                                   const double total_res, const double ind_res[]) :
                                   m_alpha0(alpha0),
                                   m_rV(rV),
                                   m_R0V(R0V),
                                   m_Wi(Wi),
                                   m_Li(Li),
                                   m_Cstei(Cstei),
-                                  m_tot_res(total_res) {}
+                                  m_tot_res(total_res),
+                                  m_ind_res(ind_res) {}
 
         ~cResidualOn2ViewsPoseDecompLAB(){}
 
@@ -227,7 +235,8 @@ class cResidualOn2ViewsPoseDecompLAB
                                 
         static CostFunction* Create(const Mat3d alpha0, 
                                     const std::vector<Mat3d> r0V, const std::vector<Mat3d> R0V,
-                                    const VecXd Wi, const MatXd Li, const VecXd Cstei, const double total_res);
+                                    const VecXd Wi, const MatXd Li, const VecXd Cstei, 
+                                    const double total_res, const double ind_res[]);
 
 
             private:
@@ -242,6 +251,7 @@ class cResidualOn2ViewsPoseDecompLAB
         const VecXd m_Cstei;
 
         const double m_tot_res;
+        const double *m_ind_res;
 };
 
 /* Triplets: Basic adjustment without covariance propagation 
@@ -253,13 +263,14 @@ class cResidualOn3ViewsPoseBasicLAB
                                     const std::vector<double*> cV, 
                                     const std::vector<Mat3d> rV, 
                                     const std::vector<Mat3d> R0V,
-                                    const double Pds_c,const double Pds_w) :
+                                    const double Pds_c,const double Pds_w,const double ind_res[]) :
                                   m_alpha0(alpha0),
                                   m_cV(cV),
                                   m_rV(rV),
                                   m_R0V(R0V),
                                   mPdsSqrt_c(Pds_c),
-                                  mPdsSqrt_w(Pds_w){}
+                                  mPdsSqrt_w(Pds_w),
+                                  m_ind_res(ind_res){}
 
         ~cResidualOn3ViewsPoseBasicLAB(){}
 
@@ -274,7 +285,8 @@ class cResidualOn3ViewsPoseBasicLAB
                                     const std::vector<Mat3d> r0V, 
                                     const std::vector<Mat3d> R0V,
                                     const double             Pds_c,
-                                    const double             Pds_w);
+                                    const double             Pds_w,
+                                    const double             ind_res[]);
 
 
     private:
@@ -287,6 +299,7 @@ class cResidualOn3ViewsPoseBasicLAB
         const double mPdsSqrt_c;
         const double mPdsSqrt_w;
 
+        const double * m_ind_res;
    
 };
 
@@ -299,13 +312,14 @@ class cResidualOn2ViewsPoseBasicLAB
                                     const std::vector<double*> cV, 
                                     const std::vector<Mat3d> rV, 
                                     const std::vector<Mat3d> R0V,
-                                    const double Pds_c,const double Pds_w) :
+                                    const double Pds_c,const double Pds_w,const double ind_res[]) :
                                   m_alpha0(alpha0),
                                   m_cV(cV),
                                   m_rV(rV),
                                   m_R0V(R0V),
                                   mPdsSqrt_c(Pds_c),
-                                  mPdsSqrt_w(Pds_w){}
+                                  mPdsSqrt_w(Pds_w),
+                                  m_ind_res(ind_res) {}
 
         ~cResidualOn2ViewsPoseBasicLAB(){}
 
@@ -319,7 +333,8 @@ class cResidualOn2ViewsPoseBasicLAB
                                     const std::vector<Mat3d> r0V, 
                                     const std::vector<Mat3d> R0V,
                                     const double             Pds_c,
-                                    const double             Pds_w);
+                                    const double             Pds_w,
+                                    const double             ind_res[]);
 
 
     private:
@@ -331,6 +346,8 @@ class cResidualOn2ViewsPoseBasicLAB
         
         const double mPdsSqrt_c;
         const double mPdsSqrt_w;
+
+        const double * m_ind_res;
 
    
 };

@@ -3,13 +3,13 @@ project(cov_in_motions)
 
 set(BUILD_PATH_BIN  ${PROJECT_SOURCE_DIR}/bin CACHE PATH "binaires install path")
 set(INSTALL_DIR ${BUILD_PATH_BIN})
-
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 find_package(Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
 find_package(Ceres REQUIRED)
-include_directories(${CERES_INCLUDE_DIRS})
+include_directories(${CERES_INCLUDE_DIRS} "/etc/opt/ceres-solver/internal/")
 
 #find_package(CXSparse REQUIRED)
 #include_directories(${CXSparse_INCLUDE_DIRS})
@@ -39,21 +39,25 @@ file(GLOB_RECURSE SOURCE_FILES
     "src/cov_in_motions.cpp"
     "src/bundle.cpp"
     "src/check_propagation.cpp"
+    "src/write_graph_main.cpp"
 )
 
 
 add_executable(${PROJECT_NAME} "src/main.cpp" "src/triplet_utils.cpp" "src/cov_in_motions.cpp" "src/bundle.cpp" )
 add_executable("triplet_utils" "src/triplet_utils_main.cpp" "src/triplet_utils.cpp" "src/cov_in_motions.cpp" "src/bundle.cpp")
+add_executable("write_graph" "src/write_graph_main.cpp" "src/triplet_utils.cpp" "src/cov_in_motions.cpp" "src/bundle.cpp")
 #add_executable("bench" "src/check_propagation.cpp" "src/cov_in_motions.cpp" "src/bundle.cpp" )
 
 
 target_link_libraries(${PROJECT_NAME} ${CERES_LIBRARIES} ${Boost_LIBRARIES} ) #
 target_link_libraries("triplet_utils" ${CERES_LIBRARIES} ) #
+target_link_libraries("write_graph" ${CERES_LIBRARIES} ) #
 #target_link_libraries("bench" ${CERES_LIBRARIES} ) #
 
 
 
 install (TARGETS ${PROJECT_NAME} DESTINATION ${INSTALL_DIR})
 install (TARGETS "triplet_utils" DESTINATION ${INSTALL_DIR})
+install (TARGETS "write_graph" DESTINATION ${INSTALL_DIR})
 #install (TARGETS "bench" DESTINATION ${INSTALL_DIR})
 

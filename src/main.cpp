@@ -45,18 +45,23 @@ int main(int argc,char** argv)
             ("lba_R_pds", po::value<double>(), "local BA: rotation PDS")
             ("lba_C_pds", po::value<double>(), "local BA: center PDS")
             ("lba_loss_fea", po::value<double>(), "local BA: Huber loss threshold for features")
+            ("lba_nb_min_fea_obs", po::value<int>(), "local BA: Min nb of features obs in relative motion")
             ("lba_max_err", po::value<double>(), "local BA: Reprojection error threshold for features")
             ("lba_nb_liais", po::value<double>(), "local BA: Weighting that limits the no of feature obs, def=10")
             ("lba_write_cov", po::value<bool>(), "local BA: covariance propagation ON/OFF")
             ("lba_nb_proc", po::value<int>(), "local BA: number of cores")
             ("gba_propagate", po::value<bool>(), "global BA: propagate covariance, def=true")
             ("gba_constr_gpose", po::value<bool>(), "global BA: soft constrain initial global poses, def=false")
+            ("gba_constr_gpose_cur", po::value<bool>(), "global BA: soft constrain current global poses, def=false")
             ("gba_R_pds", po::value<double>(), "global BA: rotation PDS")
             ("gba_C_pds", po::value<double>(), "global BA: center PDS")
             ("gba_loss_sim", po::value<double>(), "global BA: Huber loss threshold for similarities")
             ("gba_loss_gp", po::value<double>(), "global BA: Huber loss threshold for global poses")
+            ("gba_irls", po::value<double>(), "global BA: IRLS loss for global poses")
             ("gba_inner_iter", po::value<bool>(), "global BA: Use inner iterations")
+            ("gba_nb_max_iter", po::value<int>(), "global BA: Max number of iterations")
             ("gba_nb_proc", po::value<int>(), "global BA: number of cores")
+            ("gba_solver_evol", po::value<bool>(), "global BA: save solver evolution (params and cost)")
             ("ceres_cov", po::value<bool>(), "internal: compute ceres covariance")
 ;
 
@@ -128,6 +133,9 @@ int main(int argc,char** argv)
         if (vmap.count("lba_loss_fea")) 
             lba_opts._HUBER = vmap["lba_loss_fea"].as<double>() ;
 
+        if (vmap.count("lba_nb_min_fea_obs")) 
+            lba_opts._MIN_NUM_OBS = vmap["lba_nb_min_fea_obs"].as<int>() ;
+
         if (vmap.count("lba_max_err"))
             lba_opts._MAX_ERR = vmap["lba_max_err"].as<double>() ;
 
@@ -168,8 +176,14 @@ int main(int argc,char** argv)
         if (vmap.count("gba_loss_gp")) 
             gba_opts._HUBER_P = vmap["gba_loss_gp"].as<double>() ;
 
+        if (vmap.count("gba_irls")) 
+            gba_opts._IRLS = vmap["gba_irls"].as<double>() ;
+
         if (vmap.count("gba_inner_iter")) 
             gba_opts._INNER_ITER = vmap["gba_inner_iter"].as<bool>() ;
+
+        if (vmap.count("gba_nb_max_iter")) 
+            gba_opts._NB_MAX_ITER = vmap["gba_nb_max_iter"].as<int>() ;
 
         if (vmap.count("gba_propagate")) 
             gba_opts._PROPAGATE = vmap["gba_propagate"].as<bool>() ;
@@ -177,10 +191,15 @@ int main(int argc,char** argv)
         if (vmap.count("gba_constr_gpose")) 
             gba_opts._CONSTRAIN_GPOSE = vmap["gba_constr_gpose"].as<bool>() ;
 
+        if (vmap.count("gba_constr_gpose_cur")) 
+            gba_opts._CONSTRAIN_GPOSE_CUR = vmap["gba_constr_gpose_cur"].as<bool>() ;
+
         if (vmap.count("gba_nb_proc")) 
             gba_opts._PROC_COUNT = vmap["gba_nb_proc"].as<int>() ;
 
-
+        if (vmap.count("gba_solver_evol")) 
+            gba_opts._MONITOR_SOLVER_EVOL = vmap["gba_solver_evol"].as<bool>() ;
+        
         // run main program 
         cov_in_motions_main(inputs,
                             lba_opts,gba_opts,
